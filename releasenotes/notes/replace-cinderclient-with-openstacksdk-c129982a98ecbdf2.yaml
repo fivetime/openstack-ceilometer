@@ -1,0 +1,14 @@
+---
+upgrade:
+  - |
+    The Cinder integration now uses ``openstacksdk`` instead of
+    ``python-cinderclient``. The ``python-cinderclient`` package is no longer
+    a dependency of Ceilometer and can be removed from environments that do
+    not require it for other purposes.
+
+fixes:
+  - |
+    ``VolumeProviderPoolCapacityTotal`` and ``VolumeProviderPoolCapacityFree``
+    no longer raise an exception or emit a sample with a ``None`` volume when
+    a pool does not report the corresponding capacity field in its
+    capabilities. Such pools are now silently skipped.

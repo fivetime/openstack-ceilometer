@@ -14,8 +14,8 @@
 
 from unittest import mock
 
-from cinderclient import exceptions as cinder_exceptions
 import fixtures
+from openstack import exceptions as os_exceptions
 from oslo_config import fixture as config_fixture
 
 from ceilometer import cinder_client
@@ -36,126 +36,112 @@ class TestCinderClient(base.BaseTestCase):
             interface='publicURL')
         self.conf.config(group='service_types', cinder='volumev3')
 
-        self.cinder_client = fakes.FakeCinderClient()
-        self.mock_cinder_cls = self.useFixture(fixtures.MockPatch(
-            'cinderclient.client.Client', return_value=self.cinder_client))
         self.mock_get_session = self.useFixture(fixtures.MockPatch(
             'ceilometer.keystone_client.get_session'))
 
         self.client = cinder_client.Client(self.CONF)
 
-    def test_init_creates_cinderclient_with_session(self):
-        self.mock_cinder_cls.mock.assert_called_once_with(
-            version='3.64',
+    def test_init_creates_connection_with_session(self):
+        self.fake_conn_class_mock.assert_called_once_with(
+            block_storage_api_version='3.64',
             session=self.mock_get_session.mock.return_value,
+            oslo_conf=self.CONF,
             region_name='RegionOne',
-            interface='publicURL',
-            service_type='volumev3')
+            block_storage_interface='publicURL',
+            service_types={'volumev3'})
 
     def test_list_volumes_returns_volumes(self):
-        result = self.client.list_volumes(search_opts={'all_tenants': True})
+        result = self.client.list_volumes(search_opts={'all_projects': True})
 
         self.assertEqual(fakes.VOLUME_LIST, result)
 
     def test_list_volumes_passes_search_opts(self):
-        with mock.patch.object(
-                self.cinder_client.volumes, 'list',
-                wraps=self.cinder_client.volumes.list) as spy:
-            self.client.list_volumes(search_opts={'all_tenants': True})
+        self.client.list_volumes(search_opts={'all_projects': False})
 
-        spy.assert_called_once_with(search_opts={'all_tenants': True})
+        self.fake_conn.block_storage.volumes.assert_called_once_with(
+            details=True, all_projects=False)
 
     def test_list_volumes_default_opts(self):
-        with mock.patch.object(
-                self.cinder_client.volumes, 'list',
-                wraps=self.cinder_client.volumes.list) as spy:
-            self.client.list_volumes()
+        self.client.list_volumes()
 
-        spy.assert_called_once_with(search_opts={})
+        self.fake_conn.block_storage.volumes.assert_called_once_with(
+            details=True, all_projects=True)
 
     def test_list_volumes_propagates_exception(self):
-        self.cinder_client.volumes.list = mock.Mock(
-            side_effect=cinder_exceptions.ClientException(
-                500, 'Internal Server Error'))
+        self.fake_conn.block_storage.volumes = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
         self.assertRaises(
-            cinder_exceptions.ClientException,
+            os_exceptions.HttpException,
             self.client.list_volumes)
 
     def test_list_volume_snapshots_returns_snapshots(self):
         result = self.client.list_volume_snapshots(
-            search_opts={'all_tenants': True})
+            search_opts={'all_projects': True})
 
         self.assertEqual(fakes.SNAPSHOT_LIST, result)
 
     def test_list_volume_snapshots_passes_search_opts(self):
-        with mock.patch.object(
-                self.cinder_client.volume_snapshots, 'list',
-                wraps=self.cinder_client.volume_snapshots.list) as spy:
-            self.client.list_volume_snapshots(
-                search_opts={'all_tenants': True})
+        self.client.list_volume_snapshots(search_opts={'all_projects': False})
 
-        spy.assert_called_once_with(search_opts={'all_tenants': True})
+        self.fake_conn.block_storage.snapshots.assert_called_once_with(
+            details=True, all_projects=False)
+
+    def test_list_volume_snapshots_default_opts(self):
+        self.client.list_volume_snapshots()
+
+        self.fake_conn.block_storage.snapshots.assert_called_once_with(
+            details=True, all_projects=True)
 
     def test_list_volume_snapshots_propagates_exception(self):
-        self.cinder_client.volume_snapshots.list = mock.Mock(
-            side_effect=cinder_exceptions.ClientException(
-                500, 'Internal Server Error'))
+        self.fake_conn.block_storage.snapshots = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
         self.assertRaises(
-            cinder_exceptions.ClientException,
+            os_exceptions.HttpException,
             self.client.list_volume_snapshots)
 
     def test_list_backups_returns_backups(self):
-        result = self.client.list_backups(search_opts={'all_tenants': True})
+        result = self.client.list_backups(search_opts={'all_projects': True})
 
         self.assertEqual(fakes.BACKUP_LIST, result)
 
     def test_list_backups_passes_search_opts(self):
-        with mock.patch.object(
-                self.cinder_client.backups, 'list',
-                wraps=self.cinder_client.backups.list) as spy:
-            self.client.list_backups(search_opts={'all_tenants': True})
+        self.client.list_backups(search_opts={'all_projects': False})
 
-        spy.assert_called_once_with(search_opts={'all_tenants': True})
+        self.fake_conn.block_storage.backups.assert_called_once_with(
+            details=True, all_projects=False)
+
+    def test_list_backups_default_opts(self):
+        self.client.list_backups()
+
+        self.fake_conn.block_storage.backups.assert_called_once_with(
+            details=True, all_projects=True)
 
     def test_list_backups_propagates_exception(self):
-        self.cinder_client.backups.list = mock.Mock(
-            side_effect=cinder_exceptions.ClientException(
-                500, 'Internal Server Error'))
+        self.fake_conn.block_storage.backups = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
         self.assertRaises(
-            cinder_exceptions.ClientException,
+            os_exceptions.HttpException,
             self.client.list_backups)
 
     def test_list_pools_returns_pools(self):
-        result = self.client.list_pools(detailed=True)
+        result = self.client.list_pools()
 
         self.assertEqual(fakes.POOL_LIST, result)
 
-    def test_list_pools_passes_detailed(self):
-        with mock.patch.object(
-                self.cinder_client.pools, 'list',
-                wraps=self.cinder_client.pools.list) as spy:
-            self.client.list_pools(detailed=True)
+    def test_list_pools_calls_backend_pools(self):
+        self.client.list_pools()
 
-        spy.assert_called_once_with(detailed=True)
-
-    def test_list_pools_default_not_detailed(self):
-        with mock.patch.object(
-                self.cinder_client.pools, 'list',
-                wraps=self.cinder_client.pools.list) as spy:
-            self.client.list_pools()
-
-        spy.assert_called_once_with(detailed=False)
+        self.fake_conn.block_storage.backend_pools.assert_called_once_with()
 
     def test_list_pools_propagates_exception(self):
-        self.cinder_client.pools.list = mock.Mock(
-            side_effect=cinder_exceptions.ClientException(
-                500, 'Internal Server Error'))
+        self.fake_conn.block_storage.backend_pools = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
         self.assertRaises(
-            cinder_exceptions.ClientException,
+            os_exceptions.HttpException,
             self.client.list_pools)
 
     def test_list_services(self):
@@ -164,11 +150,15 @@ class TestCinderClient(base.BaseTestCase):
         self.assertIsInstance(result, list)
         self.assertEqual(fakes.SERVICE_LIST, result)
 
+    def test_list_services_calls_services(self):
+        self.client.list_services()
+
+        self.fake_conn.block_storage.services.assert_called_once_with()
+
     def test_list_services_propagates_exception(self):
-        self.cinder_client.services.list = mock.Mock(
-            side_effect=cinder_exceptions.ClientException(
-                500, 'Internal Server Error'))
+        self.fake_conn.block_storage.services = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
         self.assertRaises(
-            cinder_exceptions.ClientException,
+            os_exceptions.HttpException,
             self.client.list_services)

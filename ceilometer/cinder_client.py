@@ -12,7 +12,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-from cinderclient import client as cinder_client
+from openstack import connection
 from oslo_config import cfg
 
 from ceilometer import keystone_client
@@ -32,29 +32,46 @@ class Client:
         # we need at least 3.41 to get user_id on snapshots.
         # we need at least 3.56 for user_id and project_id on backups.
         # we need at least 3.63 for volume_type_id on volumes.
-
-        self._client = cinder_client.Client(
-            version='3.64',
+        self._conn = connection.Connection(
+            block_storage_api_version='3.64',
             session=keystone_client.get_session(conf),
+            oslo_conf=conf,
             region_name=creds.region_name,
-            interface=creds.interface,
-            service_type=conf.service_types.cinder
+            block_storage_interface=creds.interface,
+            service_types={conf.service_types.cinder}
         )
 
     def list_volumes(self, search_opts=None):
         search_opts = dict(search_opts or {})
-        return self._client.volumes.list(search_opts=search_opts)
+        all_projects = search_opts.pop('all_projects', True)
+        return list(
+            self._conn.block_storage.volumes(
+                details=True,
+                all_projects=all_projects,
+                **search_opts))
 
     def list_volume_snapshots(self, search_opts=None):
         search_opts = dict(search_opts or {})
-        return self._client.volume_snapshots.list(search_opts=search_opts)
+        all_projects = search_opts.pop('all_projects', True)
+        return list(
+            self._conn.block_storage.snapshots(
+                details=True,
+                all_projects=all_projects,
+                **search_opts))
 
     def list_backups(self, search_opts=None):
         search_opts = dict(search_opts or {})
-        return self._client.backups.list(search_opts=search_opts)
+        all_projects = search_opts.pop('all_projects', True)
+        return list(
+            self._conn.block_storage.backups(
+                details=True,
+                all_projects=all_projects,
+                **search_opts))
 
-    def list_pools(self, detailed=False):
-        return self._client.pools.list(detailed=detailed)
+    def list_pools(self):
+        # openstacksdk hardcodes detail=True in the Pools resource URL, so
+        # detailed capacity data is always returned.
+        return list(self._conn.block_storage.backend_pools())
 
     def list_services(self):
-        return self._client.services.list()
+        return list(self._conn.block_storage.services())

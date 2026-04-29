@@ -14,8 +14,8 @@
 
 from unittest import mock
 
-from cinderclient import exceptions as cinder_exceptions
 import fixtures
+from openstack import exceptions as os_exceptions
 
 from ceilometer import service
 from ceilometer.tests import base
@@ -30,17 +30,7 @@ class _BaseDiscoveryTestCase(base.BaseTestCase):
         self.CONF = service.prepare_service([], [])
         self.useFixture(
             fixtures.MockPatch('ceilometer.keystone_client.get_session'))
-        self.useFixture(fixtures.MockPatch(
-            'cinderclient.client.Client',
-            return_value=fakes.FakeCinderClient()))
         self.manager = mock.Mock()
-
-    def cinder_client_exception(self, *args, **kwargs):
-        """Raises a cinder ClientException for use in tests as a side effect.
-
-        """
-
-        raise cinder_exceptions.ClientException(500)
 
 
 class TestVolumeDiscovery(_BaseDiscoveryTestCase):
@@ -49,35 +39,37 @@ class TestVolumeDiscovery(_BaseDiscoveryTestCase):
         super().setUp()
         self.discovery = discovery.VolumeDiscovery(self.CONF)
 
+    def test_keystone_required_for_cinder_service(self):
+        self.assertEqual(
+            'cinder',
+            self.discovery.KEYSTONE_REQUIRED_FOR_SERVICE)
+
     def test_discover_returns_volumes(self):
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual(fakes.VOLUME_LIST, resources)
 
     def test_discover_empty(self):
-        self.discovery.client._client.volumes.list = mock.Mock(
-            return_value=[])
+        self.setup_connection(volumes=[])
+        self.discovery = discovery.VolumeDiscovery(self.CONF)
 
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual([], resources)
 
-    def test_discover_calls_list_volumes_with_all_tenants(self):
-        with mock.patch.object(
-            self.discovery.client._client.volumes, 'list',
-            wraps=self.discovery.client._client.volumes.list
-        ) as spy:
+    def test_discover_calls_list_volumes_with_all_projects(self):
+        result = self.discovery.discover(self.manager)
 
-            self.discovery.discover(self.manager)
-
-            spy.assert_called_once_with(search_opts={'all_tenants': True})
+        self.fake_conn.block_storage.volumes.assert_called_once_with(
+            details=True, all_projects=True)
+        self.assertEqual(fakes.VOLUME_LIST, result)
 
     def test_discover_propagates_exception(self):
-        self.discovery.client._client.volumes.list = (
-            self.cinder_client_exception)
+        self.fake_conn.block_storage.volumes = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
         self.assertRaises(
-            cinder_exceptions.ClientException,
+            os_exceptions.HttpException,
             self.discovery.discover, self.manager)
 
 
@@ -87,38 +79,39 @@ class TestVolumeSnapshotsDiscovery(_BaseDiscoveryTestCase):
         super().setUp()
         self.discovery = discovery.VolumeSnapshotsDiscovery(self.CONF)
 
+    def test_keystone_required_for_cinder_service(self):
+        self.assertEqual(
+            'cinder',
+            self.discovery.KEYSTONE_REQUIRED_FOR_SERVICE)
+
     def test_discover_returns_snapshots(self):
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual(fakes.SNAPSHOT_LIST, resources)
 
     def test_discover_empty(self):
-        self.discovery.client._client.volume_snapshots.list = mock.Mock(
-            return_value=[])
+        self.setup_connection(snapshots=[])
+        self.discovery = discovery.VolumeSnapshotsDiscovery(self.CONF)
 
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual([], resources)
 
-    def test_discover_calls_list_snapshots_with_all_tenants(self):
-        with mock.patch.object(
-            self.discovery.client._client.volume_snapshots, 'list',
-            wraps=self.discovery.client._client.volume_snapshots.list
-        ) as spy:
-            self.discovery.discover(self.manager)
+    def test_discover_calls_list_volume_snapshots_with_all_projects(self):
+        result = self.discovery.discover(self.manager)
 
-            spy.assert_called_once_with(search_opts={'all_tenants': True})
+        self.fake_conn.block_storage.snapshots.assert_called_once_with(
+            details=True, all_projects=True)
+        self.assertEqual(fakes.SNAPSHOT_LIST, result)
 
     def test_discover_propagates_exception(self):
-        with mock.patch.object(
-                self.discovery.client._client.volume_snapshots, 'list',
-                side_effect=cinder_exceptions.ClientException(500)):
+        self.fake_conn.block_storage.snapshots = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
-            self.discovery = discovery.VolumeSnapshotsDiscovery(self.CONF)
-
-            self.assertRaises(
-                cinder_exceptions.ClientException,
-                self.discovery.discover, self.manager)
+        self.assertRaises(
+            os_exceptions.HttpException,
+            self.discovery.discover,
+            self.manager)
 
 
 class TestVolumeBackupsDiscovery(_BaseDiscoveryTestCase):
@@ -127,35 +120,39 @@ class TestVolumeBackupsDiscovery(_BaseDiscoveryTestCase):
         super().setUp()
         self.discovery = discovery.VolumeBackupsDiscovery(self.CONF)
 
+    def test_keystone_required_for_cinder_service(self):
+        self.assertEqual(
+            'cinder',
+            self.discovery.KEYSTONE_REQUIRED_FOR_SERVICE)
+
     def test_discover_returns_backups(self):
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual(fakes.BACKUP_LIST, resources)
 
     def test_discover_empty(self):
-        self.discovery.client._client.backups.list = mock.Mock(return_value=[])
+        self.setup_connection(backups=[])
+        self.discovery = discovery.VolumeBackupsDiscovery(self.CONF)
 
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual([], resources)
 
-    def test_discover_calls_list_backups_with_all_tenants(self):
-        with mock.patch.object(
-                self.discovery.client._client.backups, 'list',
-                wraps=self.discovery.client._client.backups.list) as spy:
+    def test_discover_calls_list_backups_with_all_projects(self):
+        result = self.discovery.discover(self.manager)
 
-            self.discovery.discover(self.manager)
-
-            spy.assert_called_once_with(
-                search_opts={'all_tenants': True})
+        self.fake_conn.block_storage.backups.assert_called_once_with(
+            details=True, all_projects=True)
+        self.assertEqual(fakes.BACKUP_LIST, result)
 
     def test_discover_propagates_exception(self):
-        self.discovery.client._client.backups.list = (
-            self.cinder_client_exception)
+        self.fake_conn.block_storage.backups = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
         self.assertRaises(
-            cinder_exceptions.ClientException,
-            self.discovery.discover, self.manager)
+            os_exceptions.HttpException,
+            self.discovery.discover,
+            self.manager)
 
 
 class TestVolumePoolsDiscovery(_BaseDiscoveryTestCase):
@@ -164,35 +161,37 @@ class TestVolumePoolsDiscovery(_BaseDiscoveryTestCase):
         super().setUp()
         self.discovery = discovery.VolumePoolsDiscovery(self.CONF)
 
+    def test_keystone_required_for_cinder_service(self):
+        self.assertEqual(
+            'cinder',
+            self.discovery.KEYSTONE_REQUIRED_FOR_SERVICE)
+
     def test_discover_returns_pools(self):
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual(fakes.POOL_LIST, resources)
 
     def test_discover_empty(self):
-        self.discovery.client._client.pools.list = mock.Mock(return_value=[])
+        self.setup_connection(pools=[])
+        self.discovery = discovery.VolumePoolsDiscovery(self.CONF)
 
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual([], resources)
 
-    def test_discover_calls_list_pools_with_detailed_true(self):
-        with mock.patch.object(
-            self.discovery.client._client.pools, 'list',
-            wraps=self.discovery.client._client.pools.list
-        ) as spy:
+    def test_discover_calls_backend_pools(self):
+        self.discovery.discover(self.manager)
 
-            self.discovery.discover(self.manager)
-
-            spy.assert_called_once_with(detailed=True)
+        self.fake_conn.block_storage.backend_pools.assert_called_once_with()
 
     def test_discover_propagates_exception(self):
-        self.discovery.client._client.pools.list = (
-            self.cinder_client_exception)
+        self.fake_conn.block_storage.backend_pools = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
         self.assertRaises(
-            cinder_exceptions.ClientException,
-            self.discovery.discover, self.manager)
+            os_exceptions.HttpException,
+            self.discovery.discover,
+            self.manager)
 
 
 class TestVolumeServicesDiscovery(_BaseDiscoveryTestCase):
@@ -201,33 +200,35 @@ class TestVolumeServicesDiscovery(_BaseDiscoveryTestCase):
         super().setUp()
         self.discovery = discovery.VolumeServicesDiscovery(self.CONF)
 
+    def test_keystone_required_for_cinder_service(self):
+        self.assertEqual(
+            'cinder',
+            self.discovery.KEYSTONE_REQUIRED_FOR_SERVICE)
+
     def test_discover_returns_services(self):
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual(fakes.SERVICE_LIST, resources)
 
     def test_discover_empty(self):
-        self.discovery.client._client.services.list = mock.Mock(
-            return_value=[])
+        self.setup_connection(services=[])
+        self.discovery = discovery.VolumeServicesDiscovery(self.CONF)
 
         resources = self.discovery.discover(self.manager)
 
         self.assertEqual([], resources)
 
-    def test_discover_calls_list_services_with_no_args(self):
-        with mock.patch.object(
-            self.discovery.client._client.services, 'list',
-            wraps=self.discovery.client._client.services.list
-        ) as spy:
+    def test_discover_calls_list_with_no_args(self):
+        result = self.discovery.discover(self.manager)
 
-            self.discovery.discover(self.manager)
-
-            spy.assert_called_once_with()
+        self.fake_conn.block_storage.services.assert_called_once_with()
+        self.assertEqual(fakes.SERVICE_LIST, result)
 
     def test_discover_propagates_exception(self):
-        self.discovery.client._client.services.list = (
-            self.cinder_client_exception)
+        self.fake_conn.block_storage.services = mock.Mock(
+            side_effect=os_exceptions.HttpException())
 
         self.assertRaises(
-            cinder_exceptions.ClientException,
-            self.discovery.discover, self.manager)
+            os_exceptions.HttpException,
+            self.discovery.discover,
+            self.manager)
