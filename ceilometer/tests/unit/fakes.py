@@ -866,6 +866,12 @@ SERVICE_CINDER_BACKUP = cinder_service.Service(connection=None, **{
     'zone': 'nova',
     'status': 'enabled',
     'state': 'down'})
+SERVICE_CINDER_UNKNOWN_STATUS = cinder_service.Service(connection=None, **{
+    'binary': 'cinder-volume',
+    'host': 'devstack',
+    'zone': 'nova',
+    'status': 'enabled',
+    'state': 'unknown'})
 
 VOLUME_LIST = [VOLUME]
 SNAPSHOT_LIST = [SNAPSHOT]
