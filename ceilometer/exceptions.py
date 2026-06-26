@@ -15,7 +15,9 @@
 
 class CeilometerException(Exception):
     """Base exception class for Ceilometer."""
-    pass
+    def __init__(self, message=None):
+        self.message = self.__class__.__name__ if message is None else message
+        super().__init__(self.message)
 
 
 class NotFound(CeilometerException):
@@ -24,9 +26,9 @@ class NotFound(CeilometerException):
     Raised when a find operation matches no resources.
     """
 
-    def __init__(self, msg, details):
-        self.message = msg
-        self.details = details
+    def __init__(self, message, details=None):
+        self.details = details if details is not None else {}
+        super().__init__(message)
 
 
 class NoUniqueMatch(CeilometerException):
