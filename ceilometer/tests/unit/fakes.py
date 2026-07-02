@@ -13,6 +13,7 @@
 # under the License.
 
 
+import openstack
 from openstack.block_storage.v3 import backup as cinder_backup
 from openstack.block_storage.v3 import service as cinder_service
 from openstack.block_storage.v3 import snapshot as cinder_snapshot
@@ -478,13 +479,126 @@ class FakeSDKNetworkClient:
         return iter([VPN_SERVICE_0])
 
 
+IMAGE_UBUNTU = openstack.image.v2.image.Image(
+    connection=None,
+    status="active", visibility="public",
+    name="ubuntu-12.04-x86",
+    container_format="bare",
+    created_at="2026-07-23T16:31:34Z",
+    disk_format="raw",
+    updated_at="2026-08-06T16:31:34Z",
+    min_disk=1,
+    protected=False,
+    checksum="4708c575c7bc57bea8d112c64a5a6fa1",
+    min_ram=0,
+    tags=[],
+    virtual_size=2000000000,
+    size=250000000,
+    owner="2d1689c3a5d3482a98544acaa7edef2f",
+    id="a1f4684e-58bd-4c88-aefd-2ecb0783b497",
+)
+
+IMAGE_FEDORA = openstack.image.v2.image.Image(
+    connection=None,
+    name="Fedora-Cloud-Base-37-1.7.x86_64",
+    disk_format="qcow2", container_format="bare",
+    visibility="public", size=492830720, virtual_size=5368709120,
+    status="active", checksum="36f7b464b6ab46ad97c001b539495e90",
+    protected=False, min_ram=0, min_disk=0,
+    owner="2d1689c3a5d3482a98544acaa7edef2f",
+    id="32ab7d96-fabf-4d1a-a8af-38d0fe3a2b92", tags=[],
+)
+IMAGE_AMPHORA = openstack.image.v2.image.Image(
+    connection=None,
+    name="amphora-x64-haproxy",
+    disk_format="qcow2", container_format="bare",
+    visibility="public", size=379393024, virtual_size=2147483648,
+    status="active", checksum="9a78cb8545b522bd59a3a31d5a131468",
+    protected=False, min_ram=0, min_disk=0,
+    owner="2d1689c3a5d3482a98544acaa7edef2f",
+    id="1cfa6322-5302-4b2d-9748-3b230ea4447d",
+    created_at="2026-01-26T14:36:30Z",
+    updated_at="2026-01-26T14:36:39Z", tags=['amphora'],
+)
+IMAGE_CIRROS = openstack.image.v2.image.Image(
+    connection=None,
+    name="cirros-0.6.3-x86_64-disk",
+    disk_format="qcow2", container_format="bare",
+    visibility="public", size=21692416, virtual_size=117440512,
+    status="active", checksum="87617e24a5e30cb3b87fda8c0764838f",
+    protected=False, min_ram=0, min_disk=0,
+    owner="2d1689c3a5d3482a98544acaa7edef2f",
+    id="8e16de93-6ba5-42a7-8fbd-679607110d7a",
+    created_at="2026-01-26T14:35:30Z",
+    updated_at="2026-01-26T14:35:31Z",
+    tags=[],
+)
+IMAGE_CIRROS_DISK = openstack.image.v2.image.Image(
+    connection=None,
+    name="cirros-0.6.1-x86_64-disk",
+    disk_format="qcow2", container_format="bare",
+    visibility="public", size=21233664, virtual_size=117440512,
+    status="active", protected=False, min_ram=0, min_disk=0,
+    owner="2d1689c3a5d3482a98544acaa7edef2f",
+    id="389c678d-4686-4426-ba7c-0697f065c520",
+    created_at="2026-01-26T14:35:27Z",
+    updated_at="2026-01-26T14:35:29Z", tags=[],
+)
+
+IMAGE_LIST = [
+    IMAGE_FEDORA, IMAGE_AMPHORA,
+    IMAGE_CIRROS, IMAGE_CIRROS_DISK,
+    IMAGE_UBUNTU]
+
+
+class FakeSDKImageClient:
+    """Fake openstack/image/v2/_proxy.Proxy."""
+    def __init__(self, images=None):
+        self._images = images if images is not None else IMAGE_LIST
+
+    def images(self, **query):
+        """Return a generator of images
+
+        :param kwargs query: Optional query parameters to be sent to limit
+            the resources being returned.
+
+        :returns: A generator of image objects
+        :rtype: :class:`~openstack.image.v2.image.Image`
+        """
+        if query:
+            raise NotImplementedError(
+                "FakeSDKImageClient.images does not support query param")
+        return iter(self._images)
+
+    def get_image(self, image):
+        """Get a single image
+
+        :param image: The value can be the ID of a image or a
+            :class:`~openstack.image.v2.image.Image` instance.
+
+        :returns: One :class:`~openstack.image.v2.image.Image`
+        :raises: :class:`~openstack.exceptions.NotFoundException`
+            when no resource can be found.
+        """
+        if isinstance(image, openstack.image.v2.image.Image):
+            image_id = image.id
+        else:
+            image_id = image
+
+        image_list = [i for i in self.images() if i.id == image_id]
+        try:
+            return image_list[0]
+        except IndexError:
+            raise openstack.exceptions.NotFoundException
+
+
 class FakeConnection:
     """Fake connection object for testing."""
 
     def __init__(self, session=None, domains=None, projects=None, zones=None,
                  recordsets=None, shares=None, load_balancers=None,
                  volumes=None, snapshots=None, backups=None, pools=None,
-                 services=None):
+                 services=None, images=None):
         """Initialize FakeConnection.
 
         :param projects: Optional list of SDK Project objects. Defaults to the
@@ -507,8 +621,10 @@ class FakeConnection:
             FakeSDKCinderClient.
         :param pools: Optional list of SDK Volume Pools. Passed to
             FakeSDKCinderClient.
-        :param volumes: Optional list of SDK Volume Service. Passed to
+        :param services: Optional list of SDK Volume Service. Passed to
             FakeSDKCinderClient.
+        :param images: Optional list of SDK Image objects. Passed to
+            FakeSDKImageClient.
         """
 
         self.dns = FakeSDKDesignateClient(zones=zones, recordsets=recordsets)
@@ -516,6 +632,7 @@ class FakeConnection:
         self.load_balancer = FakeSDKOctaviaClient(
             load_balancers=load_balancers)
         self.network = FakeSDKNetworkClient()
+        self.image = FakeSDKImageClient(images=images)
         self.session = session or FakeSession()
         # Don't use a short-circuit or here. The explicit check for None is
         # needed since [] is falsey, but is a valid input e.g. to create a
