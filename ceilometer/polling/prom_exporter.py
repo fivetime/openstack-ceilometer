@@ -14,7 +14,10 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+from oslo_log import log
 import prometheus_client as prom
+
+LOG = log.getLogger(__name__)
 
 CEILOMETER_REGISTRY = prom.CollectorRegistry()
 
@@ -30,6 +33,13 @@ def export(prom_iface, prom_port, tls_cert=None, tls_key=None):
 def collect_metrics(samples):
     for sample in samples:
         name = "ceilometer_" + sample['counter_name'].replace('.', '_')
+
+        if sample['counter_volume'] is None:
+            LOG.warning("Skipping sample for metric %s with no "
+                        "counter_volume (resource: %s).",
+                        name, sample.get('resource_id'))
+            continue
+
         labels = _gen_labels(sample)
 
         metric = CEILOMETER_REGISTRY._names_to_collectors.get(name, None)
