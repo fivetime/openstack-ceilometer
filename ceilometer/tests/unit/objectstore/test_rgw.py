@@ -240,3 +240,36 @@ class TestRgwPollsterTLS(base.BaseTestCase):
                 ValueError,
                 r"Valid values are \[1.2, 1.3\], but found ''"):
             self.conf.set_override('tls_min_version', '', group='rgw_client')
+
+
+class TestRgwPollsterMissingConfig(base.BaseTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.conf = service.prepare_service([], [])
+        self.manager = TestManager(0, self.conf)
+
+    def tearDown(self):
+        super().tearDown()
+        rgw._Base._ENDPOINT = None
+
+    def test_get_endpoint_does_not_raise_when_config_missing(self):
+        result = rgw._Base._get_endpoint(self.conf, self.manager.keystone)
+
+        self.assertIsNone(result)
+
+    def test_get_endpoint_logs_error_when_config_missing(self):
+        with mock.patch.object(rgw.LOG, 'error') as mock_log:
+            rgw._Base._get_endpoint(self.conf, self.manager.keystone)
+
+        mock_log.assert_called_once()
+        self.assertIn('Skipping radosgw polling',
+                      mock_log.call_args[0][0])
+
+    def test_pollster_yields_no_samples_when_config_missing(self):
+        pollster = rgw.ObjectsPollster(self.conf)
+
+        samples = list(pollster.get_samples(self.manager, {},
+                                            ASSIGNED_TENANTS))
+
+        self.assertEqual(0, len(samples))

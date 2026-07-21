@@ -12,10 +12,14 @@
 # under the License.
 
 from aodhclient import client as aodh_client
+from aodhclient import exceptions as aodh_exc
 from oslo_config import cfg
+from oslo_log import log
 
 from ceilometer import keystone_client
 from ceilometer.polling import plugin_base
+
+LOG = log.getLogger(__name__)
 
 SERVICE_OPTS = [
     cfg.StrOpt('aodh',
@@ -37,4 +41,10 @@ class AlarmDiscovery(plugin_base.DiscoveryBase):
 
     def discover(self, manager, param=None):
         """Discover resources to monitor."""
-        return [self.aodh_client.metrics.get(all_projects=True)]
+        try:
+            return [self.aodh_client.metrics.get(all_projects=True)]
+        except aodh_exc.Forbidden as e:
+            # NOTE(jwysogla): aodh will return 403 when the metric
+            # endpoint is disabled in aodh.conf
+            LOG.error('Skipping alarm discovery, aodh issue: %s', e)
+            return []
