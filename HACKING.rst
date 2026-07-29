@@ -8,7 +8,6 @@ Ceilometer Style Commandments
 Ceilometer Specific Commandments
 --------------------------------
 
-- [C301] LOG.warn() is not allowed. Use LOG.warning()
 - [C302] Deprecated library function os.popen()
 
 Running Unit Tests
