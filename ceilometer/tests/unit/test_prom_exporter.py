@@ -222,6 +222,71 @@ class TestPromExporter(base.BaseTestCase):
         }
     ]
 
+    test_image_size_queued = [
+        {
+            'source': 'openstack',
+            'counter_name': 'image.size',
+            'counter_type': 'gauge',
+            'counter_unit': 'B',
+            'counter_volume': None,
+            'user_id': None,
+            'user_name': None,
+            'project_id': 'abd178778aa64cba96e1397475a2c0ed',
+            'project_name': None,
+            'resource_id': '62bd7745-db96-4274-9966-405d314e364b',
+            'timestamp': '2026-07-15T20:01:56.000000',
+            'resource_metadata': {
+                'status': 'queued',
+                'visibility': 'shared',
+                'name': 'cirros_queued_image',
+                'container_format': 'bare',
+                'created_at': '2026-07-15T20:01:24Z',
+                'disk_format': 'qcow2',
+                'updated_at': '2026-07-15T20:01:56Z',
+                'min_disk': 1,
+                'is_protected': False,
+                'checksum': None,
+                'min_ram': 1,
+                'tags': [],
+                'virtual_size': None
+            },
+            'message_id': '19f8f78a-2ee9-11ef-a95f-bd45e2085de4',
+            'monotonic_time': None,
+            'message_signature': 'f8d9a411b0cd0cb0d34e83'
+        },
+        {
+            'source': 'openstack',
+            'counter_name': 'image.size',
+            'counter_type': 'gauge',
+            'counter_unit': 'B',
+            'counter_volume': 21692416,
+            'user_id': None,
+            'user_name': None,
+            'project_id': 'abd178778aa64cba96e1397475a2c0ed',
+            'project_name': None,
+            'resource_id': '73278fe8-de27-43ca-956e-f450b2d14bad',
+            'timestamp': '2026-07-13T21:43:17.000000',
+            'resource_metadata': {
+                'status': 'active',
+                'visibility': 'shared',
+                'name': 'cirros',
+                'container_format': 'bare',
+                'created_at': '2026-07-13T21:43:16Z',
+                'disk_format': 'qcow2',
+                'updated_at': '2026-07-13T21:43:17Z',
+                'min_disk': 0,
+                'is_protected': False,
+                'checksum': '87617e24a5e30cb3b87fda8c0764838f',
+                'min_ram': 0,
+                'tags': [],
+                'virtual_size': 117440512
+            },
+            'message_id': '19f8f78a-2ee9-11ef-a95f-bd45e2085de5',
+            'monotonic_time': None,
+            'message_signature': 'f8d9a411b0cd0cb0d34e83'
+        }
+    ]
+
     @mock.patch('ceilometer.polling.prom_exporter.export')
     def test_prom_disabled(self, export):
         CONF = service.prepare_service([], [])
@@ -362,6 +427,33 @@ class TestPromExporter(base.BaseTestCase):
                          get_sample_value(
                              'ceilometer_disk_device_read_latency',
                              sample_dict_3))
+
+    @mock.patch.object(prom_exporter.LOG, 'warning')
+    def test_collect_metrics_null_counter_volume(self, mock_warning):
+        prom_exporter.collect_metrics(self.test_image_size_queued)
+
+        image_size_series = {}
+        for metric in prom_exporter.CEILOMETER_REGISTRY.collect():
+            if metric.name == 'ceilometer_image_size':
+                for sample in metric.samples:
+                    resource_id = sample.labels['resource']
+                    image_size_series[resource_id] = sample.value
+
+        queued_image_id = '62bd7745-db96-4274-9966-405d314e364b'
+        self.assertNotIn(queued_image_id,
+                         image_size_series)
+
+        active_image_id = '73278fe8-de27-43ca-956e-f450b2d14bad'
+        self.assertIn(active_image_id,
+                      image_size_series)
+        self.assertEqual(
+            21692416,
+            image_size_series[active_image_id])
+
+        mock_warning.assert_called_once_with(
+            "Skipping sample for metric %s with no "
+            "counter_volume (resource: %s).",
+            'ceilometer_image_size', queued_image_id)
 
     def test_gen_labels(self):
         slabels1 = dict(keys=[], values=[])
