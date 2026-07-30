@@ -30,18 +30,6 @@ from hacking import core
 
 
 @core.flake8ext
-def no_log_warn(logical_line):
-    """Disallow 'LOG.warn('
-
-    https://bugs.launchpad.net/tempest/+bug/1508442
-
-    C301
-    """
-    if logical_line.startswith('LOG.warn('):
-        yield (0, 'C301 Use LOG.warning() rather than LOG.warn()')
-
-
-@core.flake8ext
 def no_os_popen(logical_line):
     """Disallow 'os.popen('
 
