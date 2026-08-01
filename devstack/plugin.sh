@@ -284,6 +284,19 @@ function start_ceilometer {
     run_process ceilometer-acompute "$CEILOMETER_BIN_DIR/ceilometer-polling --polling-namespaces compute --config-file $CEILOMETER_CONF" $LIBVIRT_GROUP
 }
 
+# configure_tempest_for_ceilometer() - Configure all the tempest settings
+function configure_tempest_for_ceilometer {
+    if is_service_enabled tempest; then
+        iniset $TEMPEST_CONFIG telemetry alarm_granularity $CEILOMETER_ALARM_GRANULARITY
+        iniset $TEMPEST_CONFIG telemetry alarm_threshold $CEILOMETER_ALARM_THRESHOLD
+        iniset $TEMPEST_CONFIG telemetry alarm_metric_name $CEILOMETER_ALARM_METRIC_NAME
+        iniset $TEMPEST_CONFIG telemetry alarm_aggregation_method $CEILOMETER_ALARM_AGGREGATION_METHOD
+
+        local metric_backends=${CEILOMETER_BACKENDS//sg-core/prometheus}
+        iniset $TEMPEST_CONFIG telemetry_services metric_backends $metric_backends
+    fi
+}
+
 # stop_ceilometer() - Stop running processes
 function stop_ceilometer {
 
@@ -315,10 +328,7 @@ if is_service_enabled ceilometer; then
         # Start the services
         start_ceilometer
     elif [[ "$1" == "stack" && "$2" == "test-config" ]]; then
-        iniset $TEMPEST_CONFIG telemetry alarm_granularity $CEILOMETER_ALARM_GRANULARITY
-        iniset $TEMPEST_CONFIG telemetry alarm_threshold $CEILOMETER_ALARM_THRESHOLD
-        iniset $TEMPEST_CONFIG telemetry alarm_metric_name $CEILOMETER_ALARM_METRIC_NAME
-        iniset $TEMPEST_CONFIG telemetry alarm_aggregation_method $CEILOMETER_ALARM_AGGREGATION_METHOD
+        configure_tempest_for_ceilometer
     fi
 
     if [[ "$1" == "unstack" ]]; then
