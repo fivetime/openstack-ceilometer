@@ -804,7 +804,8 @@ class AgentManager(cotyledon.Service):
                                 p.name)
                     continue
                 group_prefix = p.name
-                generated_group_id = eval(p.group_id_coordination_expression)
+                generated_group_id = eval(  # noqa: S307
+                    p.group_id_coordination_expression)
 
                 group_for_coordination = "{}-{}".format(
                     group_prefix, generated_group_id)

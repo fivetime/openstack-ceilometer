@@ -34,7 +34,7 @@ class NonOpenStackCredentialsDiscovery(EndpointDiscovery):
     BARBICAN_URL_GET_PAYLOAD_PATTERN = "/v1/secrets/%s/payload"
 
     def discover(self, manager, param=None):
-        barbican_secret = "No secrets found"
+        barbican_secret = "No secrets found"  # noqa: S105
         if not param:
             return [barbican_secret]
         barbican_endpoints = super().discover(manager, "key-manager")
