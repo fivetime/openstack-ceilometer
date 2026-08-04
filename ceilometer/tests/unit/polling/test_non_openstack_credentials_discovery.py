@@ -46,11 +46,11 @@ class TestNonOpenStackCredentialsDiscovery(base.BaseTestCase):
     def test_discover_no_parameters(self):
         result = self.discovery.discover(None, None)
 
-        self.assertEqual(['No secrets found'], result)
+        self.assertEqual([], result)
 
         result = self.discovery.discover(None, "")
 
-        self.assertEqual(['No secrets found'], result)
+        self.assertEqual([], result)
 
     def test_discover_no_barbican_endpoint(self):
         def discover_mock(self, manager, param=None):
@@ -61,7 +61,7 @@ class TestNonOpenStackCredentialsDiscovery(base.BaseTestCase):
 
         result = self.discovery.discover(None, "param")
 
-        self.assertEqual(['No secrets found'], result)
+        self.assertEqual([], result)
 
         EndpointDiscovery.discover = original_discover_method
 
