@@ -280,7 +280,7 @@ class PollsterSampleExtractor:
                       "pollster [%s].", operation, value,
                       definitions["name"])
 
-            value = eval(operation.strip())
+            value = eval(operation.strip())  # noqa: S307
             LOG.debug("Result [%s] of operation [%s] for pollster [%s].",
                       value, operation, definitions["name"])
         return value
@@ -928,7 +928,7 @@ class PollsterSampleGatherer:
             self.definitions.configurations.get(
                 'base_metadata', {}))
         try:
-            url_path = eval(url_path, params)
+            url_path = eval(url_path, params)  # noqa: S307
         except Exception:
             LOG.debug("Cannot eval path [%s] with params [%s],"
                       " using [%s] instead.",
@@ -1003,7 +1003,7 @@ class HostCommandSamplesGatherer(PollsterSampleGatherer):
     def _internal_execute_request_get_samples(self, definitions, **kwargs):
         command = self.get_command(definitions, **kwargs)
         LOG.debug('Running Host command: [%s]', command)
-        result = subprocess.getoutput(command)
+        result = subprocess.getoutput(command)  # noqa: S605
         LOG.debug('Host command [%s] result: [%s]', command, result)
         return self.Response(result), command
 
@@ -1013,7 +1013,7 @@ class HostCommandSamplesGatherer(PollsterSampleGatherer):
             self.definitions.configurations.get(
                 'base_metadata', {}))
         try:
-            command = eval(command, params)
+            command = eval(command, params)  # noqa: S307
         except Exception:
             LOG.debug("Cannot eval command [%s] with params [%s],"
                       " using [%s] instead.",
@@ -1060,7 +1060,7 @@ class NonOpenStackApisSamplesGatherer(PollsterSampleGatherer):
         LOG.debug("Executing request against [url=%s] with parameters ["
                   "%s] for pollsters [%s]", url, request_arguments,
                   definitions["name"])
-        resp = requests.get(url, **request_arguments)
+        resp = requests.get(url, **request_arguments)  # noqa: S113
 
         if resp.status_code != requests.codes.ok:
             raise declarative.NonOpenStackApisDynamicPollsterException(

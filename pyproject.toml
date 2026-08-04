@@ -30,23 +30,12 @@ select = [
     "F",
     "G",
     "LOG",
+    "S",
     "UP",
     "W",
 ]
 external = ["H"]
 ignore = [
-    # we only use asserts for type narrowing
-    "S101",
-    # we do not use random number geneerators for crypto
-    "S311",
-    # S104 Possible binding to all interfaces
-    "S104",
-    # S105 Possible hardcoded password assigned to variable"
-    "S105",
-    # S106 Possible hardcoded password assigned to argument
-    "S106",
-    # S110 `try`-`except`-`pass` detected, consider logging the exception
-    "S110",
     # UP031 % format — defer f-string migration to a later pass
     "UP031",
     # UP032 f-string — defer migration to a later pass
@@ -55,6 +44,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "doc/*" = ["E501"]
+"ceilometer/tests/*" = ["S"]
+"tools/*" = ["S"]
 
 [tool.ruff.lint.mccabe]
 # Flag errors (`C901`) whenever the complexity level exceeds 25.
