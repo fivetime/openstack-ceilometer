@@ -64,6 +64,13 @@ class TestVolumeSizePollster(base.BaseTestCase):
         self.assertIn('image_id', metadata)
         self.assertIn('instance_id', metadata)
 
+    def test_volume_metadata_contains_remapped_fields(self):
+        samples = list(self.pollster.get_samples(
+            self.manager, {}, resources=fakes.VOLUME_LIST))
+        metadata = samples[0].resource_metadata
+        self.assertIn('os-vol-host-attr:host', metadata)
+        self.assertIn('source_volid', metadata)
+
 
 class TestVolumeSnapshotSizePollster(base.BaseTestCase):
     def setUp(self):
@@ -294,14 +301,14 @@ class TestVolumeProviderPoolCapacityVirtualFreePollster(base.BaseTestCase):
         self.assertEqual(0, len(samples))
 
     def test_get_samples_missing_thin_provisioning_raises_err(self):
-        """Verify missing thin_provisioning_support raises AttributeError.
+        """Verify missing thin_provisioning_support raises KeyError.
 
         When provisioned_capacity_gb IS set but thin_provisioning_support is
         missing, the pollster attempts to access the attribute and raises
-        AttributeError. This documents current behavior.
+        KeyError. This documents current behavior.
         """
         self.assertRaises(
-            AttributeError,
+            KeyError,
             list,
             self.pollster.get_samples(
                 self.manager, {},
@@ -324,7 +331,7 @@ class TestVolumeProviderPoolCapacityVirtualFreePollster(base.BaseTestCase):
         Setup: provisioned_capacity_gb set, but reserved_percentage missing
         Expected behaviour: there is an error
         """
-        self.assertRaises(AttributeError, list, self.pollster.get_samples(
+        self.assertRaises(KeyError, list, self.pollster.get_samples(
             self.manager, {}, resources=[fakes.POOL_NO_RESERVED_PERCENTAGE]))
 
 
@@ -370,7 +377,7 @@ class TestVolumeProviderPoolCapacityAllocatedPollster(base.BaseTestCase):
 
     def test_get_samples_missing_allocated_cap_raises_err(self):
         self.assertRaises(
-            AttributeError,
+            KeyError,
             list,
             self.pollster.get_samples(
                 self.manager, {},
@@ -423,6 +430,15 @@ class TestVolumeServiceHealthPollster(base.BaseTestCase):
             self.assertIn('host', metadata)
             self.assertIn('zone', metadata)
             self.assertIn('status', metadata)
+
+    def test_zone_populated_from_availability_zone(self):
+        samples = list(
+            self.pollster.get_samples(
+                self.manager, {}, resources=fakes.SERVICE_LIST))
+
+        self.assertIn('zone', samples[0].resource_metadata)
+        self.assertNotIn('availability_zone', samples[0].resource_metadata)
+        self.assertEqual('nova', samples[0].resource_metadata['zone'])
 
     def test_volume_service_health_unknown_state(self):
         bad_service = [

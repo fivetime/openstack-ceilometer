@@ -40,11 +40,9 @@ class VolumeSizePollster(_Base):
               'volume_type',
               'volume_type_id',
               'availability_zone',
-              'os-vol-host-attr:host',
               'migration_status',
               'attachments',
-              'snapshot_id',
-              'source_volid']
+              'snapshot_id']
 
     def extract_metadata(self, obj):
         metadata = super().extract_metadata(obj)
@@ -58,6 +56,10 @@ class VolumeSizePollster(_Base):
             metadata["instance_id"] = obj.attachments[0]["server_id"]
         else:
             metadata["instance_id"] = None
+        # Map SDK attribute names to preserve backward compatibility with
+        # cinderclient metadata field names
+        metadata["os-vol-host-attr:host"] = getattr(obj, "host")
+        metadata["source_volid"] = getattr(obj, "source_volume_id")
 
         return metadata
 
@@ -69,8 +71,7 @@ class VolumeSizePollster(_Base):
                 unit='GiB',
                 volume=volume.size,
                 user_id=volume.user_id,
-                project_id=getattr(volume,
-                                   'os-vol-tenant-attr:tenant_id'),
+                project_id=volume.project_id,
                 resource_id=volume.id,
                 resource_metadata=self.extract_metadata(volume),
             )
@@ -86,8 +87,14 @@ class VolumeSnapshotSize(_Base):
               'status',
               'description',
               'metadata',
-              'os-extended-snapshot-attributes:progress',
               ]
+
+    def extract_metadata(self, obj):
+        metadata = super().extract_metadata(obj)
+        # Map SDK attribute names to preserve backward compatibility with
+        # cinderclient metadata field names
+        metadata["os-extended-snapshot-attributes:progress"] = obj.progress
+        return metadata
 
     def get_samples(self, manager, cache, resources):
         for snapshot in resources:
@@ -97,9 +104,7 @@ class VolumeSnapshotSize(_Base):
                 unit='GiB',
                 volume=snapshot.size,
                 user_id=snapshot.user_id,
-                project_id=getattr(
-                    snapshot,
-                    'os-extended-snapshot-attributes:project_id'),
+                project_id=snapshot.project_id,
                 resource_id=snapshot.id,
                 resource_metadata=self.extract_metadata(snapshot),
             )
@@ -126,8 +131,7 @@ class VolumeBackupSize(_Base):
                 unit='GiB',
                 volume=backup.size,
                 user_id=backup.user_id,
-                project_id=getattr(
-                    backup, 'os-backup-project-attr:project_id', None),
+                project_id=backup.project_id,
                 resource_id=backup.id,
                 resource_metadata=self.extract_metadata(backup),
             )
@@ -136,7 +140,8 @@ class VolumeBackupSize(_Base):
 class _VolumeProviderPoolBase(_Base):
     def extract_metadata(self, obj):
         metadata = super().extract_metadata(obj)
-        metadata['pool_name'] = getattr(obj, "pool_name", None)
+        caps = obj.capabilities or {}
+        metadata['pool_name'] = caps.get("pool_name") or None
         return metadata
 
 
@@ -147,16 +152,18 @@ class VolumeProviderPoolCapacityTotal(_VolumeProviderPoolBase):
 
     def get_samples(self, manager, cache, resources):
         for pool in resources:
-            yield sample.Sample(
-                name='volume.provider.pool.capacity.total',
-                type=sample.TYPE_GAUGE,
-                unit='GiB',
-                volume=pool.total_capacity_gb,
-                user_id=None,
-                project_id=None,
-                resource_id=pool.name,
-                resource_metadata=self.extract_metadata(pool)
-            )
+            caps = pool.capabilities
+            if caps.get('total_capacity_gb') is not None:
+                yield sample.Sample(
+                    name='volume.provider.pool.capacity.total',
+                    type=sample.TYPE_GAUGE,
+                    unit='GiB',
+                    volume=caps.get('total_capacity_gb'),
+                    user_id=None,
+                    project_id=None,
+                    resource_id=pool.name,
+                    resource_metadata=self.extract_metadata(pool)
+                )
 
 
 class VolumeProviderPoolCapacityFree(_VolumeProviderPoolBase):
@@ -166,16 +173,18 @@ class VolumeProviderPoolCapacityFree(_VolumeProviderPoolBase):
 
     def get_samples(self, manager, cache, resources):
         for pool in resources:
-            yield sample.Sample(
-                name='volume.provider.pool.capacity.free',
-                type=sample.TYPE_GAUGE,
-                unit='GiB',
-                volume=pool.free_capacity_gb,
-                user_id=None,
-                project_id=None,
-                resource_id=pool.name,
-                resource_metadata=self.extract_metadata(pool)
-            )
+            caps = pool.capabilities
+            if caps.get('free_capacity_gb') is not None:
+                yield sample.Sample(
+                    name='volume.provider.pool.capacity.free',
+                    type=sample.TYPE_GAUGE,
+                    unit='GiB',
+                    volume=caps['free_capacity_gb'],
+                    user_id=None,
+                    project_id=None,
+                    resource_id=pool.name,
+                    resource_metadata=self.extract_metadata(pool)
+                )
 
 
 class VolumeProviderPoolCapacityProvisioned(_VolumeProviderPoolBase):
@@ -185,12 +194,13 @@ class VolumeProviderPoolCapacityProvisioned(_VolumeProviderPoolBase):
 
     def get_samples(self, manager, cache, resources):
         for pool in resources:
-            if getattr(pool, 'provisioned_capacity_gb', None):
+            caps = pool.capabilities
+            if caps.get('provisioned_capacity_gb'):
                 yield sample.Sample(
                     name='volume.provider.pool.capacity.provisioned',
                     type=sample.TYPE_GAUGE,
                     unit='GiB',
-                    volume=pool.provisioned_capacity_gb,
+                    volume=caps['provisioned_capacity_gb'],
                     user_id=None,
                     project_id=None,
                     resource_id=pool.name,
@@ -205,19 +215,21 @@ class VolumeProviderPoolCapacityVirtualFree(_VolumeProviderPoolBase):
 
     def get_samples(self, manager, cache, resources):
         for pool in resources:
-            if getattr(pool, 'provisioned_capacity_gb', None):
+            caps = pool.capabilities or {}
+            if caps.get('provisioned_capacity_gb'):
                 reserved_size = math.floor(
-                    (pool.reserved_percentage / 100) * pool.total_capacity_gb
+                    (caps['reserved_percentage'] / 100) *
+                    caps['total_capacity_gb']
                 )
                 max_over_subscription_ratio = 1.0
-                if pool.thin_provisioning_support:
+                if caps['thin_provisioning_support']:
                     max_over_subscription_ratio = float(
-                        pool.max_over_subscription_ratio
+                        caps.get('max_over_subscription_ratio', 1.0)
                     )
                 value = (
                     max_over_subscription_ratio *
-                    (pool.total_capacity_gb - reserved_size) -
-                    pool.provisioned_capacity_gb
+                    (caps['total_capacity_gb'] - reserved_size) -
+                    caps['provisioned_capacity_gb']
                 )
                 yield sample.Sample(
                     name='volume.provider.pool.capacity.virtual_free',
@@ -238,11 +250,12 @@ class VolumeProviderPoolCapacityAllocated(_VolumeProviderPoolBase):
 
     def get_samples(self, manager, cache, resources):
         for pool in resources:
+            caps = pool.capabilities or {}
             yield sample.Sample(
                 name='volume.provider.pool.capacity.allocated',
                 type=sample.TYPE_GAUGE,
                 unit='GiB',
-                volume=pool.allocated_capacity_gb,
+                volume=caps['allocated_capacity_gb'],
                 user_id=None,
                 project_id=None,
                 resource_id=pool.name,
@@ -255,7 +268,14 @@ class VolumeServiceHealthPollster(_Base):
     def default_discovery(self):
         return 'volume_services'
 
-    FIELDS = ['binary', 'host', 'zone', 'status']
+    FIELDS = ['binary', 'host', 'status']
+
+    def extract_metadata(self, obj):
+        metadata = super().extract_metadata(obj)
+        # Map SDK attribute names to preserve backward compatibility with
+        # cinderclient metadata field names
+        metadata['zone'] = getattr(obj, 'availability_zone', None)
+        return metadata
 
     def get_samples(self, manager, cache, resources):
         for svc in resources:

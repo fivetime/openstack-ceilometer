@@ -16,6 +16,8 @@ from ceilometer.polling import plugin_base
 
 
 class _BaseDiscovery(plugin_base.DiscoveryBase):
+    KEYSTONE_REQUIRED_FOR_SERVICE = 'cinder'
+
     def __init__(self, conf):
         super().__init__(conf)
         self.client = cinder_client.Client(conf)
@@ -25,29 +27,28 @@ class VolumeDiscovery(_BaseDiscovery):
     def discover(self, manager, param=None):
         """Discover volume resources to monitor."""
 
-        return self.client.list_volumes(search_opts={'all_tenants': True})
+        return self.client.list_volumes()
 
 
 class VolumeSnapshotsDiscovery(_BaseDiscovery):
     def discover(self, manager, param=None):
         """Discover snapshot resources to monitor."""
 
-        return self.client.list_volume_snapshots(
-            search_opts={'all_tenants': True})
+        return self.client.list_volume_snapshots()
 
 
 class VolumeBackupsDiscovery(_BaseDiscovery):
     def discover(self, manager, param=None):
-        """Discover volume resources to monitor."""
+        """Discover backup resources to monitor."""
 
-        return self.client.list_backups(search_opts={'all_tenants': True})
+        return self.client.list_backups()
 
 
 class VolumePoolsDiscovery(_BaseDiscovery):
     def discover(self, manager, param=None):
         """Discover volume resources to monitor."""
 
-        return self.client.list_pools(detailed=True)
+        return self.client.list_pools()
 
 
 class VolumeServicesDiscovery(_BaseDiscovery):

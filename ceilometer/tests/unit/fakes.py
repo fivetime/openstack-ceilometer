@@ -13,11 +13,11 @@
 # under the License.
 
 
-from cinderclient.v3 import pools as cinder_pools
-from cinderclient.v3 import services as cinder_services
-from cinderclient.v3 import volume_backups as cinder_backups
-from cinderclient.v3 import volume_snapshots as cinder_snapshots
-from cinderclient.v3 import volumes as cinder_volumes
+from openstack.block_storage.v3 import backup as cinder_backup
+from openstack.block_storage.v3 import service as cinder_service
+from openstack.block_storage.v3 import snapshot as cinder_snapshot
+from openstack.block_storage.v3 import stats as cinder_stats
+from openstack.block_storage.v3 import volume as cinder_volume
 from openstack.dns.v2 import recordset
 from openstack.dns.v2 import zone
 from openstack.identity.v3 import domain as sdk_domain
@@ -391,6 +391,33 @@ class FakeSession:
         self.auth = self.FakeAuth()
 
 
+class FakeSDKCinderClient:
+
+    def __init__(
+            self, volumes=None, snapshots=None, backups=None,
+            pools=None, services=None):
+        self._volumes = volumes if volumes is not None else VOLUME_LIST
+        self._snapshots = snapshots if snapshots is not None else SNAPSHOT_LIST
+        self._backups = backups if backups is not None else BACKUP_LIST
+        self._pools = pools if pools is not None else POOL_LIST
+        self._services = services if services is not None else SERVICE_LIST
+
+    def volumes(self, *, details=True, all_projects=False, **query):
+        return iter(self._volumes)
+
+    def snapshots(self, *, details=True, **query):
+        return iter(self._snapshots)
+
+    def backups(self, *, details=True, **query):
+        return iter(self._backups)
+
+    def backend_pools(self, **query):
+        return iter(self._pools)
+
+    def services(self, **query):
+        return iter(self._services)
+
+
 class FakeSDKNetworkClient:
 
     def ips(self):
@@ -454,9 +481,10 @@ class FakeSDKNetworkClient:
 class FakeConnection:
     """Fake connection object for testing."""
 
-    def __init__(self, session=None, domains=None, projects=None,
-                 zones=None, recordsets=None, shares=None,
-                 load_balancers=None):
+    def __init__(self, session=None, domains=None, projects=None, zones=None,
+                 recordsets=None, shares=None, load_balancers=None,
+                 volumes=None, snapshots=None, backups=None, pools=None,
+                 services=None):
         """Initialize FakeConnection.
 
         :param projects: Optional list of SDK Project objects. Defaults to the
@@ -471,6 +499,16 @@ class FakeConnection:
             FakeSDKManilaClient.
         :param load_balancers: Optional list of SDK LoadBalancer objects.
             Passed to FakeSDKOctaviaClient.
+        :param volumes: Optional list of SDK Volumes. Passed to
+            FakeSDKCinderClient.
+        :param snapshots: Optional list of SDK Volume Snapshots. Passed to
+            FakeSDKCinderClient.
+        :param backups: Optional list of SDK Volume Backups. Passed to
+            FakeSDKCinderClient.
+        :param pools: Optional list of SDK Volume Pools. Passed to
+            FakeSDKCinderClient.
+        :param volumes: Optional list of SDK Volume Service. Passed to
+            FakeSDKCinderClient.
         """
 
         self.dns = FakeSDKDesignateClient(zones=zones, recordsets=recordsets)
@@ -485,6 +523,13 @@ class FakeConnection:
         self._domains = domains if domains is not None else DEFAULT_DOMAINS_sdk
         self._projects = (
             projects if projects is not None else DEFAULT_PROJECTS_sdk)
+
+        self.block_storage = FakeSDKCinderClient(
+            volumes=volumes,
+            snapshots=snapshots,
+            backups=backups,
+            pools=pools,
+            services=services)
 
     def list_projects(self, domain_id=None, name_or_id=None, filters=None):
         """List projects.
@@ -588,7 +633,7 @@ class FakeConnection:
 # Cinder Fakes
 #####################
 
-VOLUME = cinder_volumes.Volume(manager=None, info={
+VOLUME = cinder_volume.Volume(connection=None, **{
     'migration_status': None,
     'attachments': [
         {'server_id': '1ae69721-d071-4156-a2bd-b11bb43ec2e3',
@@ -642,7 +687,7 @@ VOLUME = cinder_volumes.Volume(manager=None, info={
     'created_at': '2016-06-23T08:27:45.000000',
     'volume_type': 'lvmdriver-1',
 })
-SNAPSHOT = cinder_snapshots.Snapshot(manager=None, info={
+SNAPSHOT = cinder_snapshot.Snapshot(connection=None, **{
     'status': 'available',
     'os-extended-snapshot-attributes:progress': '100%',
     'description': None,
@@ -658,7 +703,7 @@ SNAPSHOT = cinder_snapshots.Snapshot(manager=None, info={
     'group_snapshot_id': None,
     'name': None,
 })
-BACKUP = cinder_backups.VolumeBackup(manager=None, info={
+BACKUP = cinder_backup.Backup(connection=None, **{
     'status': 'available',
     'object_count': 0,
     'container': None,
@@ -682,61 +727,67 @@ BACKUP = cinder_backups.VolumeBackup(manager=None, info={
     'id': '75a52125-85ff-4a8d-b2aa-580f3b22273f',
     'size': 1,
 })
-POOL_LVM = cinder_pools.Pool(manager=None, info={
+POOL_LVM = cinder_stats.Pools(connection=None, **{
     'name': 'localhost.localdomain@lvmdriver-1#lvmdriver-1',
-    'pool_name': 'lvmdriver-1',
-    'total_capacity_gb': 28.5,
-    'free_capacity_gb': 28.39,
-    'reserved_percentage': 0,
-    'location_info':
-        'LVMVolumeDriver:localhost.localdomain:stack-volumes:thin:0',
-    'QoS_support': False,
-    'provisioned_capacity_gb': 4.0,
-    'max_over_subscription_ratio': 20.0,
-    'thin_provisioning_support': True,
-    'thick_provisioning_support': False,
-    'total_volumes': 3,
-    'filter_function': None,
-    'goodness_function': None,
-    'multiattach': True,
-    'backend_state': 'up',
-    'allocated_capacity_gb': 4,
-    'cacheable': True,
-    'volume_backend_name': 'lvmdriver-1',
-    'storage_protocol': 'iSCSI',
-    'vendor_name': 'Open Source',
-    'driver_version': '3.0.0',
-    'timestamp': '2025-03-21T14:19:02.901750',
+    'capabilities': {
+        'pool_name': 'lvmdriver-1',
+        'total_capacity_gb': 28.5,
+        'free_capacity_gb': 28.39,
+        'reserved_percentage': 0,
+        'location_info':
+            'LVMVolumeDriver:localhost.localdomain:stack-volumes:thin:0',
+        'QoS_support': False,
+        'provisioned_capacity_gb': 4.0,
+        'max_over_subscription_ratio': 20.0,
+        'thin_provisioning_support': True,
+        'thick_provisioning_support': False,
+        'total_volumes': 3,
+        'filter_function': None,
+        'goodness_function': None,
+        'multiattach': True,
+        'backend_state': 'up',
+        'allocated_capacity_gb': 4,
+        'cacheable': True,
+        'volume_backend_name': 'lvmdriver-1',
+        'storage_protocol': 'iSCSI',
+        'vendor_name': 'Open Source',
+        'driver_version': '3.0.0',
+        'timestamp': '2025-03-21T14:19:02.901750',
+    },
 })
 
-POOL_CEPH = cinder_pools.Pool(manager=None, info={
+POOL_CEPH = cinder_stats.Pools(connection=None, **{
     'name': 'cinder-3ceee-volume-ceph-0@ceph#ceph',
-    'vendor_name': 'Open Source',
-    'driver_version': '1.3.0',
-    'storage_protocol': 'ceph',
-    'total_capacity_gb': 85.0,
-    'free_capacity_gb': 85.0,
-    'reserved_percentage': 0,
-    'multiattach': True,
-    'thin_provisioning_support': True,
-    'max_over_subscription_ratio': '20.0',
-    'location_info':
-        'ceph:/etc/ceph/ceph.conf:a94b63c4e:openstack:volumes',
-    'backend_state': 'up',
-    'QoS_support': True,
-    'volume_backend_name': 'ceph',
-    'replication_enabled': False,
-    'allocated_capacity_gb': 1,
-    'filter_function': None,
-    'goodness_function': None,
-    'timestamp': '2025-06-09T13:29:43.286226',
+    'capabilities': {
+        'vendor_name': 'Open Source',
+        'driver_version': '1.3.0',
+        'storage_protocol': 'ceph',
+        'total_capacity_gb': 85.0,
+        'free_capacity_gb': 85.0,
+        'reserved_percentage': 0,
+        'multiattach': True,
+        'thin_provisioning_support': True,
+        'max_over_subscription_ratio': '20.0',
+        'location_info':
+            'ceph:/etc/ceph/ceph.conf:a94b63c4e:openstack:volumes',
+        'backend_state': 'up',
+        'QoS_support': True,
+        'volume_backend_name': 'ceph',
+        'replication_enabled': False,
+        'allocated_capacity_gb': 1,
+        'filter_function': None,
+        'goodness_function': None,
+        'timestamp': '2025-06-09T13:29:43.286226',
+    },
 })
 
-POOL_ZERO_ALLOCATED_CAPACITY = cinder_pools.Pool(manager=None, info={
+POOL_ZERO_ALLOCATED_CAPACITY = cinder_stats.Pools(connection=None, **{
     'name': 'localhost.localdomain@lvmdriver-1#lvmdriver-1',
-    'allocated_capacity_gb': 0,
+    'capabilities': {
+        'allocated_capacity_gb': 0,
+    },
 })
-POOL_NO_CAPABILITIES = cinder_pools.Pool(manager=None, info={
+POOL_NO_CAPABILITIES = cinder_stats.Pools(connection=None, **{
     'name': 'localhost.localdomain@lvmdriver-1#lvmdriver-1',
 })
 
@@ -744,64 +795,72 @@ POOL_NO_CAPABILITIES = cinder_pools.Pool(manager=None, info={
 # missing. The pollster uses getattr(pool, 'provisioned_capacity_gb', None)
 # as a guard, so pools missing this attribute are silently skipped
 # (yield no samples).
-POOL_NO_PROVISIONED_CAPACITY = cinder_pools.Pool(manager=None, info={
+POOL_NO_PROVISIONED_CAPACITY = cinder_stats.Pools(connection=None, **{
     'name': 'localhost.localdomain@lvmdriver-2#lvmdriver-2',
-    'pool_name': 'lvmdriver-2',
-    'total_capacity_gb': 28.5,
-    'free_capacity_gb': 28.39,
-    'reserved_percentage': 0,
-    'max_over_subscription_ratio': 20.0,
-    'thin_provisioning_support': True,
-    'allocated_capacity_gb': 4,
+    'capabilities': {
+        'pool_name': 'lvmdriver-2',
+        'total_capacity_gb': 28.5,
+        'free_capacity_gb': 28.39,
+        'reserved_percentage': 0,
+        'max_over_subscription_ratio': 20.0,
+        'thin_provisioning_support': True,
+        'allocated_capacity_gb': 4,
+    }
 })
 
 # Test fixture for VirtualFree pollster when thin_provisioning_support is
 # missing. When provisioned_capacity_gb IS set but thin_provisioning_support
 # is missing, the pollster attempts to access the attribute and raises
 # AttributeError.
-POOL_NO_THIN_PROVISIONING = cinder_pools.Pool(manager=None, info={
+POOL_NO_THIN_PROVISIONING = cinder_stats.Pools(connection=None, **{
     'name': 'localhost.localdomain@lvmdriver-3#lvmdriver-3',
-    'pool_name': 'lvmdriver-3',
-    'total_capacity_gb': 28.5,
-    'free_capacity_gb': 28.39,
-    'reserved_percentage': 0,
-    'provisioned_capacity_gb': 4.0,
-    'max_over_subscription_ratio': 20.0,
-    'allocated_capacity_gb': 4,
+    'capabilities': {
+        'pool_name': 'lvmdriver-3',
+        'total_capacity_gb': 28.5,
+        'free_capacity_gb': 28.39,
+        'reserved_percentage': 0,
+        'provisioned_capacity_gb': 4.0,
+        'max_over_subscription_ratio': 20.0,
+        'allocated_capacity_gb': 4,
+    }
 })
 
 # Test fixture for VirtualFree pollster with thick provisioning.
 # When thin_provisioning_support=False, max_over_subscription_ratio defaults to
 # 1.0 in the calculation: 1.0 * (28.5 - 0) - 4.0 = 24.5 virtual free capacity.
-POOL_THICK_PROVISIONING = cinder_pools.Pool(manager=None, info={
+POOL_THICK_PROVISIONING = cinder_stats.Pools(connection=None, **{
     'name': 'localhost.localdomain@lvmdriver-4#lvmdriver-4',
-    'pool_name': 'lvmdriver-4',
-    'total_capacity_gb': 28.5,
-    'free_capacity_gb': 28.39,
-    'reserved_percentage': 0,
-    'provisioned_capacity_gb': 4.0,
-    'max_over_subscription_ratio': 20.0,
-    'thin_provisioning_support': False,
-    'allocated_capacity_gb': 4,
+    'capabilities': {
+        'pool_name': 'lvmdriver-4',
+        'total_capacity_gb': 28.5,
+        'free_capacity_gb': 28.39,
+        'reserved_percentage': 0,
+        'provisioned_capacity_gb': 4.0,
+        'max_over_subscription_ratio': 20.0,
+        'thin_provisioning_support': False,
+        'allocated_capacity_gb': 4,
+    }
 })
 
 # Test fixture for VirtualFree pollster when reserved_percentage is not set
-POOL_NO_RESERVED_PERCENTAGE = cinder_pools.Pool(manager=None, info={
-    'name': 'mypool', 'provisioned_capacity_gb': 100, })
+POOL_NO_RESERVED_PERCENTAGE = cinder_stats.Pools(connection=None, **{
+    'name': 'mypool',
+    'capabilities': {
+        'provisioned_capacity_gb': 100, }})
 
-SERVICE_CINDER_VOLUME = cinder_services.Service(manager=None, info={
+SERVICE_CINDER_VOLUME = cinder_service.Service(connection=None, **{
     'binary': 'cinder-volume',
     'host': 'devstack',
     'zone': 'nova',
     'status': 'enabled',
     'state': 'up'})
-SERVICE_CINDER_SCHED = cinder_services.Service(manager=None, info={
+SERVICE_CINDER_SCHED = cinder_service.Service(connection=None, **{
     'binary': 'cinder-scheduler',
     'host': 'devstack',
     'zone': 'nova',
     'status': 'enabled',
     'state': 'up'})
-SERVICE_CINDER_BACKUP = cinder_services.Service(manager=None, info={
+SERVICE_CINDER_BACKUP = cinder_service.Service(connection=None, **{
     'binary': 'cinder-backup',
     'host': 'devstack',
     'zone': 'nova',
@@ -814,65 +873,3 @@ BACKUP_LIST = [BACKUP]
 POOL_LIST = [POOL_LVM, POOL_CEPH]
 SERVICE_LIST = [
     SERVICE_CINDER_VOLUME, SERVICE_CINDER_SCHED, SERVICE_CINDER_BACKUP]
-
-
-class FakeVolumeManager:
-    """Fake cinderclient VolumeManager."""
-
-    def __init__(self, volumes=None):
-        self._volumes = volumes if volumes is not None else VOLUME_LIST
-
-    def list(self, search_opts=None):
-        return self._volumes
-
-
-class FakeSnapshotManager:
-    """Fake cinderclient SnapshotManager."""
-
-    def __init__(self, snapshots=None):
-        self._snapshots = snapshots if snapshots is not None else SNAPSHOT_LIST
-
-    def list(self, search_opts=None):
-        return self._snapshots
-
-
-class FakeBackupManager:
-    """Fake cinderclient BackupManager."""
-
-    def __init__(self, backups=None):
-        self._backups = backups if backups is not None else BACKUP_LIST
-
-    def list(self, search_opts=None):
-        return self._backups
-
-
-class FakePoolManager:
-    """Fake cinderclient PoolManager."""
-
-    def __init__(self, pools=None):
-        self._pools = pools if pools is not None else POOL_LIST
-
-    def list(self, detailed=False):
-        return self._pools
-
-
-class FakeServiceManager:
-    """Fake cinderclient ServiceManager."""
-
-    def __init__(self, services=None):
-        self._services = services if services is not None else SERVICE_LIST
-
-    def list(self):
-        return self._services
-
-
-class FakeCinderClient:
-    """Fake cinderclient.client.Client for testing."""
-
-    def __init__(self, volumes=None, snapshots=None, backups=None, pools=None,
-                 services=None):
-        self.volumes = FakeVolumeManager(volumes)
-        self.volume_snapshots = FakeSnapshotManager(snapshots)
-        self.backups = FakeBackupManager(backups)
-        self.pools = FakePoolManager(pools)
-        self.services = FakeServiceManager(services)
