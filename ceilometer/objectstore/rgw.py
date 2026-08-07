@@ -111,9 +111,12 @@ class _Base(plugin_base.PollsterBase):
             service_name = conf.rgw_client.rgw_service_name
 
             if service_type is None and service_name is None:
-                raise RuntimeError(
-                    "Required config not found, need either "
-                    "rgw_client.rgw_service_name or service_types.radosgw")
+                LOG.error(
+                    "Skipping radosgw polling, config issue: Required "
+                    "config not found, need either "
+                    "rgw_client.rgw_service_name or "
+                    "service_types.radosgw")
+                return None
             try:
                 # Use the service_name to target the endpoint.
                 # There are cases where both 'radosgw' and 'swift' are used.

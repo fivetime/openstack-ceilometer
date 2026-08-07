@@ -1,0 +1,12 @@
+---
+fixes:
+  - |
+    The alarm discovery pollster now logs an error instead of raising an
+    exception with a full traceback when the aodh metric endpoint is
+    disabled (aodh returns 403 Forbidden). Similarly, the RGW pollster
+    now logs an error instead of raising a ``RuntimeError`` when neither
+    ``rgw_client.rgw_service_name`` nor ``service_types.radosgw`` is
+    configured. This better aligns their behavior with other pollsters such as
+    Manila and Designate, and significantly reduces log noise when all
+    pollsters are enabled via the ``*`` wildcard.
+    See `bug 2161437 <https://bugs.launchpad.net/ceilometer/+bug/2161437>`_.
