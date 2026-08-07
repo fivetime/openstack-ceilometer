@@ -441,16 +441,7 @@ class TestVolumeServiceHealthPollster(base.BaseTestCase):
         self.assertEqual('nova', samples[0].resource_metadata['zone'])
 
     def test_volume_service_health_unknown_state(self):
-        bad_service = [
-            type('Service', (object,),
-                 {'binary': 'cinder-volume',
-                  'host': 'devstack',
-                  'zone': 'nova',
-                  'status': 'enabled',
-                  'state': 'unknown'}),
-        ]
         self.assertRaises(
-            ValueError,
-            list,
-            self.pollster.get_samples(
-                self.manager, {}, resources=bad_service))
+            ValueError, list, self.pollster.get_samples(
+                self.manager, {}, resources=[
+                    fakes.SERVICE_CINDER_UNKNOWN_STATUS]))
