@@ -263,6 +263,18 @@ class TestVolumeProviderPoolCapacityTotalPollster(base.BaseTestCase):
         self.assertEqual('cinder-3ceee-volume-ceph-0@ceph#ceph',
                          volume_pool_size_total_samples[1].resource_id)
 
+    def test_volume_provider_pool_metadata_has_provider(self):
+        samples = list(self.pollster.get_samples(self.manager, {}, POOL_LIST))
+        # ``provider`` is what gnocchi_resources.yaml maps the required
+        # volume_provider_pool attribute from; it must match what the
+        # capacity.pool notification meters produce (name up to '#').
+        self.assertEqual('localhost.localdomain@lvmdriver-1',
+                         samples[0].resource_metadata['provider'])
+        self.assertEqual('lvmdriver-1',
+                         samples[0].resource_metadata['pool_name'])
+        self.assertEqual('cinder-3ceee-volume-ceph-0@ceph',
+                         samples[1].resource_metadata['provider'])
+
 
 class TestVolumeProviderPoolCapacityFreePollster(base.BaseTestCase):
     def setUp(self):
