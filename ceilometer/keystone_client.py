@@ -245,17 +245,12 @@ def get_auth_token(client):
 
 CLI_OPTS = [
     cfg.StrOpt('region-name',
-               deprecated_group="DEFAULT",
-               deprecated_name="os-region-name",
                default=os.environ.get('OS_REGION_NAME'),
                help='Region name to use for OpenStack service endpoints.'),
     cfg.StrOpt('interface',
-               default=os.environ.get(
-                   'OS_INTERFACE', os.environ.get('OS_ENDPOINT_TYPE',
-                                                  'public')),
-               deprecated_name="os-endpoint-type",
-               choices=('public', 'internal', 'admin', 'auth', 'publicURL',
-                        'internalURL', 'adminURL'),
+               default=os.environ.get('OS_INTERFACE', 'public'),
+               choices=('public', 'internal', 'admin',
+                        'publicURL', 'internalURL', 'adminURL'),
                help='Type of endpoint in Identity service catalog to use for '
                     'communication with OpenStack services.'),
 ]
@@ -270,12 +265,7 @@ def register_keystoneauth_opts(conf):
 
 def _register_keystoneauth_group(conf, group):
     ka_loading.register_auth_conf_options(conf, group)
-    ka_loading.register_session_conf_options(
-        conf, group,
-        deprecated_opts={'cacert': [
-            cfg.DeprecatedOpt('os-cacert', group=group),
-            cfg.DeprecatedOpt('os-cacert', group="DEFAULT")]
-        })
+    ka_loading.register_session_conf_options(conf, group)
     conf.register_opts(CLI_OPTS, group=group)
 
 
