@@ -176,6 +176,8 @@ class TestVolumeProviderPoolCapacityTotalPollster(base.BaseTestCase):
             metadata = s.resource_metadata
             self.assertIsNotNone(metadata)
             self.assertIn('pool_name', metadata)
+            self.assertEqual(s.resource_id.split('#')[0],
+                             metadata['provider'])
 
     def test_get_samples_metadata_provider(self):
         samples = list(self.pollster.get_samples(
@@ -231,6 +233,8 @@ class TestVolumeProviderPoolCapacityFreePollster(base.BaseTestCase):
             metadata = s.resource_metadata
             self.assertIsNotNone(metadata)
             self.assertIn('pool_name', metadata)
+            self.assertEqual(s.resource_id.split('#')[0],
+                             metadata['provider'])
 
     def test_get_samples_no_free_capacity_gb(self):
         """Test behaviour when required attribute is not present.
@@ -272,6 +276,8 @@ class TestVolumeProviderPoolCapacityProvisionedPollster(base.BaseTestCase):
             metadata = s.resource_metadata
             self.assertIsNotNone(metadata)
             self.assertIn('pool_name', metadata)
+            self.assertEqual(s.resource_id.split('#')[0],
+                             metadata['provider'])
 
 
 class TestVolumeProviderPoolCapacityVirtualFreePollster(base.BaseTestCase):
@@ -300,6 +306,8 @@ class TestVolumeProviderPoolCapacityVirtualFreePollster(base.BaseTestCase):
             metadata = s.resource_metadata
             self.assertIsNotNone(metadata)
             self.assertIn('pool_name', metadata)
+            self.assertEqual(s.resource_id.split('#')[0],
+                             metadata['provider'])
 
     def test_get_samples_missing_provisioned_capacity_skips_pool(self):
         """Verify pools without provisioned_capacity_gb are silently skipped.
@@ -379,6 +387,8 @@ class TestVolumeProviderPoolCapacityAllocatedPollster(base.BaseTestCase):
             metadata = s.resource_metadata
             self.assertIsNotNone(metadata)
             self.assertIn('pool_name', metadata)
+            self.assertEqual(s.resource_id.split('#')[0],
+                             metadata['provider'])
 
     def test_get_samples_zero_allocated_cap_emits_sample(self):
         samples = list(self.pollster.get_samples(
