@@ -145,18 +145,6 @@ class VolumePoolPollsterMixin:
             self.assertEqual(s.resource_id.split('#')[0],
                              metadata['provider'])
 
-    def test_get_samples_metadata_provider(self):
-        samples = self.get_samples()
-        # ``provider`` is what gnocchi_resources.yaml maps the required
-        # volume_provider_pool attribute from; it must match what the
-        # capacity.pool notification meters produce (name up to '#').
-        # Without it Gnocchi rejects every polled sample with
-        # "required key not provided @ data['provider']".
-        self.assertEqual('localhost.localdomain@lvmdriver-1',
-                         samples[0].resource_metadata['provider'])
-        self.assertEqual('cinder-3ceee-volume-ceph-0@ceph',
-                         samples[1].resource_metadata['provider'])
-
 
 class TestVolumeProviderPoolCapacityTotalPollster(
         VolumePoolPollsterMixin, _BaseTestVolumePollster):
@@ -184,6 +172,21 @@ class TestVolumeProviderPoolCapacityTotalPollster(
             self.pollster.get_samples(
                 self.manager, {}, resources=[fakes.POOL_NO_CAPABILITIES])
         )
+
+    def test_get_samples_metadata_provider(self):
+        # The mixin above checks the derivation relationally for every
+        # provider-pool pollster; this pins the literal values on the one
+        # pollster that always emits a sample per pool. ``provider`` is what
+        # gnocchi_resources.yaml maps the required volume_provider_pool
+        # attribute from, and it has to match what the capacity.pool
+        # notification meters produce (the name up to '#'). Without it
+        # Gnocchi rejects every polled sample with
+        # "required key not provided @ data['provider']".
+        samples = self.get_samples()
+        self.assertEqual('localhost.localdomain@lvmdriver-1',
+                         samples[0].resource_metadata['provider'])
+        self.assertEqual('cinder-3ceee-volume-ceph-0@ceph',
+                         samples[1].resource_metadata['provider'])
 
 
 class TestVolumeProviderPoolCapacityFreePollster(
