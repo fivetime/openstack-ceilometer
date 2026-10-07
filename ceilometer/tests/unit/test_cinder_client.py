@@ -15,8 +15,10 @@
 from unittest import mock
 
 import fixtures
+from keystoneauth1 import session as ks_session
 from openstack import exceptions as os_exceptions
 from oslo_config import fixture as config_fixture
+from oslotest import base as oslotest_base
 
 from ceilometer import cinder_client
 from ceilometer import service
@@ -45,10 +47,9 @@ class TestCinderClient(base.BaseTestCase):
         self.fake_conn_class_mock.assert_called_once_with(
             block_storage_api_version='3.64',
             session=self.mock_get_session.mock.return_value,
-            oslo_conf=self.CONF,
             region_name='RegionOne',
             block_storage_interface='publicURL',
-            service_types={'volumev3'})
+            block_storage_service_type='volumev3')
 
     def test_list_volumes_returns_volumes(self):
         result = self.client.list_volumes(search_opts={'all_projects': True})
@@ -162,3 +163,24 @@ class TestCinderClient(base.BaseTestCase):
         self.assertRaises(
             os_exceptions.HttpException,
             self.client.list_services)
+
+
+class TestCinderClientConnection(oslotest_base.BaseTestCase):
+    """Build the real SDK connection.
+
+    The tests above replace openstack.connection.Connection with a mock, so
+    they cannot tell whether the SDK actually enables the block-storage
+    service for the arguments the client passes.
+    """
+
+    def test_block_storage_service_is_enabled(self):
+        conf = service.prepare_service([], [])
+        self.useFixture(fixtures.MockPatch(
+            'ceilometer.keystone_client.get_session',
+            return_value=ks_session.Session()))
+        for service_type in ('volumev3', 'block-storage'):
+            conf.set_override('cinder', service_type, group='service_types')
+            client = cinder_client.Client(conf)
+            self.assertTrue(
+                client._conn.config.has_service('block-storage'),
+                'block-storage disabled for service type %s' % service_type)

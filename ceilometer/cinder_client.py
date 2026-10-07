@@ -32,13 +32,17 @@ class Client:
         # we need at least 3.41 to get user_id on snapshots.
         # we need at least 3.56 for user_id and project_id on backups.
         # we need at least 3.63 for volume_type_id on volumes.
+        # NOTE(fivetime): pass the service type the way the designate and
+        # manila clients do. With oslo_conf the SDK only enables a service
+        # whose options are registered in a group named after the project
+        # ([cinder]), which ceilometer does not have, so block-storage was
+        # always disabled and every cinder pollster failed.
         self._conn = connection.Connection(
             block_storage_api_version='3.64',
             session=keystone_client.get_session(conf),
-            oslo_conf=conf,
             region_name=creds.region_name,
             block_storage_interface=creds.interface,
-            service_types={conf.service_types.cinder}
+            block_storage_service_type=conf.service_types.cinder
         )
 
     def list_volumes(self, search_opts=None):

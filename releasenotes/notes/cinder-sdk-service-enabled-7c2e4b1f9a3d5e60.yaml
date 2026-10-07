@@ -1,0 +1,10 @@
+---
+fixes:
+  - |
+    Polling of Cinder resources (volumes, snapshots, backups, pools and
+    services) failed with ``ServiceDisabledException: Service
+    'block-storage' is disabled because its configuration could not be
+    loaded``. The Cinder client now passes the service type directly to the
+    OpenStack SDK connection, like the Designate and Manila clients, instead
+    of relying on a ``[cinder]`` configuration group that Ceilometer does
+    not register.
