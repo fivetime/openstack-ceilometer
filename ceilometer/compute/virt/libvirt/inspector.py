@@ -36,7 +36,19 @@ class LibvirtInspector(virt_inspector.Inspector):
     def __init__(self, conf):
         super().__init__(conf)
         # NOTE(sileht): create a connection on startup
-        self.connection
+        try:
+            self.connection
+        except Exception as e:
+            if libvirt is None or not isinstance(e, libvirt.libvirtError):
+                raise
+            # libvirtd may simply not be up yet, e.g. when the host reboots
+            # and the agent starts first. Raising here fails the setup of
+            # every compute pollster, the polling manager then skips them
+            # for the lifetime of the process and logs that only at DEBUG,
+            # so the agent keeps running without collecting anything.
+            # The connection is retried on every poll instead.
+            LOG.warning("Unable to connect to libvirt, will retry when "
+                        "polling: %s", e)
         self.cache = {}
 
     @property

@@ -602,3 +602,44 @@ class TestLibvirtInspectionWithError(base.BaseTestCase):
     def test_inspect_unknown_error(self):
         self.assertRaises(virt_inspector.InspectorException,
                           self.inspector.inspect_instance, 'foo', None)
+
+
+class TestLibvirtInspectorStartup(base.BaseTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.conf = service.prepare_service([], [])
+        fake_libvirt = mock.Mock()
+        fake_libvirt.libvirtError = FakeLibvirtError
+        self.useFixture(fixtures.MonkeyPatch(
+            'ceilometer.compute.virt.libvirt.inspector.libvirt',
+            fake_libvirt))
+
+    def _refresh(self, *side_effect):
+        refresh = mock.MagicMock(side_effect=list(side_effect))
+        self.useFixture(fixtures.MonkeyPatch(
+            'ceilometer.compute.virt.libvirt.utils.'
+            'refresh_libvirt_connection', refresh))
+        return refresh
+
+    def test_libvirt_not_up_yet(self):
+        conn = mock.Mock()
+        refresh = self._refresh(
+            FakeLibvirtError("Failed to connect socket to "
+                             "'/var/run/libvirt/libvirt-sock-ro'"),
+            conn)
+        inspector = libvirt_inspector.LibvirtInspector(self.conf)
+        self.assertIs(conn, inspector.connection)
+        self.assertEqual(2, refresh.call_count)
+
+    def test_other_error_still_raises(self):
+        self._refresh(ValueError('boom'))
+        self.assertRaises(ValueError,
+                          libvirt_inspector.LibvirtInspector, self.conf)
+
+    def test_missing_libvirt_module_still_raises(self):
+        self.useFixture(fixtures.MonkeyPatch(
+            'ceilometer.compute.virt.libvirt.inspector.libvirt', None))
+        self._refresh(ImportError('python-libvirt module is missing'))
+        self.assertRaises(ImportError,
+                          libvirt_inspector.LibvirtInspector, self.conf)
