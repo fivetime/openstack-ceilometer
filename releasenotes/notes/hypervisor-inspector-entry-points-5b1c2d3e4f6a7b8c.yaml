@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    The ``[DEFAULT] hypervisor_inspector`` option accepts the name of any
+    entry point of the ``ceilometer.compute.virt`` namespace, which is how
+    the inspector has always been loaded. A compute driver outside
+    Ceilometer (Kata, Incus) registers its inspector there. The default
+    stays ``libvirt``, and the option is no longer deprecated.

@@ -26,10 +26,10 @@ import ceilometer
 OPTS = [
     cfg.StrOpt('hypervisor_inspector',
                default='libvirt',
-               choices=['libvirt'],
-               deprecated_for_removal=True,
-               deprecated_reason='libvirt is the only supported hypervisor',
-               help='Inspector to use for inspecting the hypervisor layer.')
+               help='Inspector to use for inspecting the hypervisor layer: '
+                    'the name of an entry point of the '
+                    'ceilometer.compute.virt namespace. Ceilometer ships '
+                    'libvirt; a compute driver can register its own.')
 ]
 
 
