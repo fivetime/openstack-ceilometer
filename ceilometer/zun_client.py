@@ -43,13 +43,25 @@ class Client:
             interface=creds.interface,
             region_name=creds.region_name,
             default_microversion=API_VERSION)
+        self._prefix = None
+
+    def _url(self, path):
+        """A path under Zun's v1 API, however its endpoint was registered.
+
+        Zun registers its endpoint with the version in it (``.../v1``);
+        an endpoint registered without it still works.
+        """
+        if self._prefix is None:
+            endpoint = (self.api.get_endpoint() or '').rstrip('/')
+            self._prefix = '' if endpoint.endswith('/v1') else 'v1/'
+        return self._prefix + path
 
     def hosts(self):
         """The name of every Zun compute host, following the pages."""
         names, marker = [], None
         while True:
             params = {'marker': marker} if marker else {}
-            page = self.api.get('/v1/hosts', params=params).json()
+            page = self.api.get(self._url('hosts'), params=params).json()
             hosts = page.get('hosts') or []
             names.extend(h['hostname'] for h in hosts if h.get('hostname'))
             if not page.get('next') or not hosts:
@@ -65,5 +77,5 @@ class Client:
         params = {'type': ','.join(kinds)}
         if label:
             params['label'] = label
-        return self.api.get('/v1/hosts/%s/stats' % host,
+        return self.api.get(self._url('hosts/%s/stats' % host),
                             params=params).json()

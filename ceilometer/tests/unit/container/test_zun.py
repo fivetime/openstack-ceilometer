@@ -37,6 +37,7 @@ class ZunClientTest(base.BaseTestCase):
         with mock.patch('ceilometer.keystone_client.get_session'):
             self.client = zun_client.Client(self.conf)
         self.client.api = mock.Mock()
+        self.client.api.get_endpoint.return_value = 'http://zun:9517/v1'
 
     def _page(self, hosts, more):
         page = mock.Mock()
@@ -61,8 +62,24 @@ class ZunClientTest(base.BaseTestCase):
                                label='metering.autoscale')
 
         self.client.api.get.assert_called_once_with(
-            '/v1/hosts/node-1/stats',
+            'hosts/node-1/stats',
             params={'type': 'capsule', 'label': 'metering.autoscale'})
+
+    def test_an_endpoint_with_the_version_is_not_given_it_twice(self):
+        """Zun registers .../v1; asking for /v1/hosts there was a 404."""
+        self.client.api.get.side_effect = [self._page(['a'], more=False)]
+
+        self.client.hosts()
+
+        self.assertEqual('hosts', self.client.api.get.call_args.args[0])
+
+    def test_an_endpoint_without_the_version_is_given_it(self):
+        self.client.api.get_endpoint.return_value = 'http://zun:9517/'
+        self.client.api.get.side_effect = [self._page(['a'], more=False)]
+
+        self.client.hosts()
+
+        self.assertEqual('v1/hosts', self.client.api.get.call_args.args[0])
 
     def test_it_asks_for_the_version_with_host_stats(self):
         with mock.patch('ceilometer.keystone_client.get_session'):
