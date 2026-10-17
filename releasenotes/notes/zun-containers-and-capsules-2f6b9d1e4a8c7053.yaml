@@ -10,7 +10,9 @@ features:
     ``memory.usage``, network and disk bytes (used), and from
     notifications ``lifetime`` and the last ``cpu.time`` reading on stop
     and delete. Resources start and end with Zun's create and delete
-    events.
+    events. Allocation is taken from the ``.end`` of each operation,
+    ``container.resize.end`` included, never from ``*.update``, which is
+    also sent for an object not yet placed or that failed to start.
   - |
     New central pollsters read one Zun host per call
     (``GET /v1/hosts/{host}/stats``, Zun API 1.56) through the discoveries

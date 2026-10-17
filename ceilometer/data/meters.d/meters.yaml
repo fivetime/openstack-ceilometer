@@ -460,8 +460,11 @@ metric:
   # thing twice. What was used comes from polling (ceilometer.container);
   # these give what was allocated whenever it changes, how long each
   # lived, and what one used up to the moment it was stopped or deleted.
+  # Allocation is read from the .end of an operation only, as for nova's
+  # instances: *.update is also sent for a record not yet placed and for
+  # one that failed to start, neither of which holds anything.
   - name: 'container.cpu'
-    event_type: &zun_container_events '^container\.(create|start|stop|pause|unpause|restart|rebuild|delete)\.end$|^container\.update$'
+    event_type: &zun_container_events '^container\.(create|start|stop|pause|unpause|restart|rebuild|resize|delete)\.end$'
     type: 'gauge'
     unit: 'vcpu'
     volume: $.payload.cpu
@@ -533,7 +536,7 @@ metric:
       <<: *zun_meta
 
   - name: 'capsule.cpu'
-    event_type: &zun_capsule_events '^capsule\.(create|start|stop|pause|unpause|restart|rebuild|delete)\.end$|^capsule\.update$'
+    event_type: &zun_capsule_events '^capsule\.(create|start|stop|pause|unpause|restart|rebuild|delete)\.end$'
     type: 'gauge'
     unit: 'vcpu'
     volume: $.payload.cpu
