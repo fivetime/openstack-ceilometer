@@ -35,6 +35,7 @@ sampled: an absent figure is not a zero.
 
 from oslo_log import log
 
+from ceilometer.container import discovery
 from ceilometer.polling import plugin_base
 from ceilometer import sample
 from ceilometer import zun_client
@@ -145,12 +146,14 @@ class _ZunPollster(plugin_base.PollsterBase):
     def default_discovery(self):
         return KINDS[self.KIND]['discovery']
 
-    def _answer(self, cache, resource):
+    def _answer(self, manager, cache, resource):
         """The host's answer for this kind, read once per polling cycle."""
         key = ('zun', resource.host, resource.kind, resource.label)
         if key not in cache:
             cache[key] = self.client.host_stats(
                 resource.host, [resource.kind], label=resource.label)
+            discovery.heartbeat(manager, 'zun.read.%s.%s' % (
+                resource.kind, resource.host))
         return cache[key]
 
     def get_samples(self, manager, cache, resources):
@@ -159,7 +162,7 @@ class _ZunPollster(plugin_base.PollsterBase):
         name = '%s.%s' % (kind['prefix'], self.METER)
         for resource in resources or []:
             try:
-                answer = self._answer(cache, resource)
+                answer = self._answer(manager, cache, resource)
             except Exception as exc:
                 # One host that cannot be read costs only its own figures;
                 # the warning names it, since "no samples" alone cannot

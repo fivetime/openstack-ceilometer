@@ -24,6 +24,7 @@ for an operator who polls a fine interval only for what autoscales:
 """
 
 from oslo_config import cfg
+from oslo_utils import timeutils
 
 from ceilometer.polling import plugin_base
 from ceilometer import zun_client
@@ -65,6 +66,30 @@ class HostToRead:
         return hash((self.host, self.kind, self.label))
 
 
+def heartbeat(manager, *names):
+    """Report these names through the agent's heartbeat, stamped now.
+
+    Three kinds of entry, so a monitor can tell the ways reading Zun fails
+    apart -- a failed read otherwise shows only in the log, since the
+    pollster itself completes:
+
+    - `zun.hosts`: Zun's hosts were listed (even if there are none);
+    - `zun.listed.<host>`: the host was in that list;
+    - `zun.read.<kind>.<host>`: that kind was read from the host.
+
+    A host listed but not read has stopped answering; one no longer listed
+    is gone. Entries are never removed, so a monitor compares them with
+    each other rather than with a fixed set. A no-op unless the agent has
+    a heartbeat (heartbeat_socket_dir).
+    """
+    send = getattr(manager, 'heartbeat', None)
+    if send is None:
+        return
+    now = timeutils.utcnow().isoformat()
+    for name in names:
+        send(name, now)
+
+
 def _label(param):
     if param and param.startswith('label='):
         return param[len('label='):] or None
@@ -81,8 +106,10 @@ class _ZunHostsDiscovery(plugin_base.DiscoveryBase):
 
     def discover(self, manager, param=None):
         label = _label(param)
-        return [HostToRead(host, self.KIND, label)
-                for host in self.client.hosts()]
+        hosts = self.client.hosts()
+        heartbeat(manager, 'zun.hosts',
+                  *('zun.listed.%s' % host for host in hosts))
+        return [HostToRead(host, self.KIND, label) for host in hosts]
 
 
 class ContainersDiscovery(_ZunHostsDiscovery):
