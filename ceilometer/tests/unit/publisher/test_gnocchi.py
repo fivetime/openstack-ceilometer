@@ -13,6 +13,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import copy
+import datetime
 import os
 from unittest import mock
 import uuid
@@ -653,24 +655,24 @@ class PublisherWorkflowTest(base.BaseTestCase,
             mock.call.resource.search('instance_disk', search_params),
             mock.call.resource.update(
                 'instance', '9f9d01b9-4a58-4271-9e27-398b21ab20d1',
-                {'ended_at': now.isoformat()}),
+                {'ended_at': INSTANCE_DELETE_START.generated}),
             mock.call.resource.update(
                 'instance_disk',
                 'b26268d6-8bb5-11e6-baff-00224d8226cd',
-                {'ended_at': now.isoformat()}),
+                {'ended_at': INSTANCE_DELETE_START.generated}),
             mock.call.resource.update(
                 'instance_network_interface',
                 'b1c7544a-8bb5-11e6-850e-00224d8226cd',
-                {'ended_at': now.isoformat()}),
+                {'ended_at': INSTANCE_DELETE_START.generated}),
             mock.call.resource.update(
                 'image', 'dc337359-de70-4044-8e2c-80573ba6e577',
-                {'ended_at': now.isoformat()}),
+                {'ended_at': IMAGE_DELETE_START.generated}),
             mock.call.resource.update(
                 'volume', '6cc6e7dd-d17d-460f-ae79-7e08a216ce96',
-                {'ended_at': now.isoformat()}),
+                {'ended_at': VOLUME_DELETE_END.generated}),
             mock.call.resource.update(
                 'network', '705e2c08-08e8-45cb-8673-5c5be955569b',
-                {'ended_at': now.isoformat()})
+                {'ended_at': FLOATINGIP_DELETE_END.generated})
         ]
 
         self.publisher.publish_events([INSTANCE_DELETE_START,
@@ -700,13 +702,51 @@ class PublisherWorkflowTest(base.BaseTestCase,
                  'availability_zone': 'zone1',
                  'flavor_name': 'm1.tiny',
                  'flavor_id': '2',
-                 'host': 'vagrant-precise'}),
+                 'host': 'vagrant-precise',
+                 'started_at': INSTANCE_CREATE_END.generated}),
         ]
 
         self.publisher.publish_events([INSTANCE_CREATE_END])
         self.assertEqual(1, len(fakeclient.mock_calls))
         for call in expected_calls:
             self.assertIn(call, fakeclient.mock_calls)
+
+    @mock.patch('gnocchiclient.v1.client.Client')
+    def test_a_late_or_repeated_event_keeps_its_own_time(self, fakeclient_cls):
+        """A resource ends when it was deleted, not when we heard of it.
+
+        A message that waited in a queue, or arrived twice, must give the
+        same end -- a bill is worked out from it.
+        """
+        url = netutils.urlsplit("gnocchi://")
+        self.publisher = gnocchi.GnocchiPublisher(self.conf.conf, url)
+        fakeclient = fakeclient_cls.return_value
+        self.useFixture(utils_fixture.TimeFixture(
+            timeutils.utcnow() + datetime.timedelta(hours=3)))
+
+        self.publisher.publish_events([VOLUME_DELETE_END, VOLUME_DELETE_END])
+
+        updates = [c for c in fakeclient.mock_calls
+                   if c[0] == 'resource.update']
+        self.assertEqual(
+            [{'ended_at': VOLUME_DELETE_END.generated}] * 2,
+            [c[1][2] for c in updates])
+
+    @mock.patch('gnocchiclient.v1.client.Client')
+    def test_an_event_without_a_time_ends_now(self, fakeclient_cls):
+        url = netutils.urlsplit("gnocchi://")
+        self.publisher = gnocchi.GnocchiPublisher(self.conf.conf, url)
+        fakeclient = fakeclient_cls.return_value
+        now = timeutils.utcnow()
+        self.useFixture(utils_fixture.TimeFixture(now))
+        event = copy.deepcopy(VOLUME_DELETE_END)
+        event.generated = None
+
+        self.publisher.publish_events([event])
+
+        update = [c for c in fakeclient.mock_calls
+                  if c[0] == 'resource.update'][0]
+        self.assertEqual({'ended_at': now.isoformat()}, update[1][2])
 
     @mock.patch('gnocchiclient.v1.client.Client')
     def test_update_event_workflow(self, fakeclient_cls):
