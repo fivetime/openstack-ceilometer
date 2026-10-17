@@ -308,7 +308,9 @@ resources_update_operations = [
              "status": {"type": "string", "min_length": 0,
                         "max_length": 255, "required": False},
              "server_group": {"type": "string", "min_length": 0,
-                              "max_length": 255, "required": False}
+                              "max_length": 255, "required": False},
+             "ended_by": {"type": "string", "min_length": 0,
+                          "max_length": 255, "required": False}
          }
      }]},
     {"desc": "add zun_capsule resource type",
@@ -330,6 +332,8 @@ resources_update_operations = [
                         "max_length": 255, "required": False},
              "server_group": {"type": "string", "min_length": 0,
                               "max_length": 255, "required": False},
+             "ended_by": {"type": "string", "min_length": 0,
+                          "max_length": 255, "required": False},
              "allocation_basis": {"type": "string", "min_length": 0,
                                   "max_length": 255, "required": False}
          }
@@ -353,6 +357,8 @@ resources_update_operations = [
                         "max_length": 255, "required": False},
              "server_group": {"type": "string", "min_length": 0,
                               "max_length": 255, "required": False},
+             "ended_by": {"type": "string", "min_length": 0,
+                          "max_length": 255, "required": False},
              "capsule_uuid": {"type": "uuid", "required": False},
              "allocation_included_in_parent": {"type": "bool",
                                                "required": False}

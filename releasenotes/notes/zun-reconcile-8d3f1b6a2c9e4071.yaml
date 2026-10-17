@@ -1,0 +1,11 @@
+---
+features:
+  - |
+    ``ceilometer-zun-reconcile`` ends the Gnocchi resources of Zun
+    containers and capsules that Zun no longer has -- whose delete
+    notification was lost -- at the last time each was seen (its latest
+    measure, or when it started), and marks them ``ended_by=reconcile``
+    so they are never mistaken for an end an event gave. A host that
+    cannot be read is left alone, and a resource that started within ten
+    minutes of the run is left too. Run it periodically, for instance
+    hourly; ``--dry-run`` lists what it would end.
