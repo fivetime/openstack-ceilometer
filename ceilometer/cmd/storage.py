@@ -54,3 +54,22 @@ def upgrade():
                 exceptions.SSLError,
             ))
         )(gnocchi_client.upgrade_resource_types, conf)
+
+
+def zun_reconcile():
+    """End the Gnocchi resources of Zun objects that no longer exist."""
+    conf = cfg.ConfigOpts()
+    conf.register_cli_opts([
+        cfg.BoolOpt('dry-run', default=False,
+                    help='List what would be ended without ending it.'),
+    ])
+    service.prepare_service(conf=conf)
+    from ceilometer.container import reconcile
+    from ceilometer import gnocchi_client
+    from ceilometer import zun_client
+    ended = reconcile.reconcile(zun_client.Client(conf),
+                                gnocchi_client.get_gnocchiclient(conf),
+                                dry_run=conf.dry_run)
+    LOG.info('%(n)d Zun resource(s) %(verb)s', {
+        'n': len(ended),
+        'verb': 'would be ended' if conf.dry_run else 'ended'})
