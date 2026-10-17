@@ -1,0 +1,8 @@
+---
+fixes:
+  - |
+    The Gnocchi publisher now sets a resource's ``ended_at`` on a delete
+    event, and its ``started_at`` on a create event, to when the event
+    happened (the notification's timestamp) rather than to when the
+    publisher handled it. A message that waited in a queue, or was
+    delivered twice, no longer moves when a resource started or ended.

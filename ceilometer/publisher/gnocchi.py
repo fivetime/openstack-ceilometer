@@ -609,8 +609,23 @@ class GnocchiPublisher(publisher.ConfigPublisherBase):
         for resource in to_update:
             self._set_update_attributes(resource)
 
+    @staticmethod
+    def _event_time(event):
+        """When the event happened, as the service that sent it said.
+
+        Not when this publisher got round to it: a message that waited in
+        a queue, or arrived twice, must not move when a resource started
+        or ended -- a bill is worked out from those two times.
+        """
+        generated = getattr(event, 'generated', None)
+        if not generated:
+            return timeutils.utcnow().isoformat()
+        if hasattr(generated, 'isoformat'):
+            return generated.isoformat()
+        return str(generated)
+
     def _delete_event(self, rd, event):
-        ended_at = timeutils.utcnow().isoformat()
+        ended_at = self._event_time(event)
 
         resource = rd.event_attributes(event)
         associated_resources = rd.cfg.get('event_associated_resources', {})
@@ -629,6 +644,7 @@ class GnocchiPublisher(publisher.ConfigPublisherBase):
     def _create_event(self, rd, event):
         resource = rd.event_attributes(event)
         resource_type = resource.pop('type')
+        resource.setdefault('started_at', self._event_time(event))
 
         try:
             self._create_resource(resource_type, resource)
