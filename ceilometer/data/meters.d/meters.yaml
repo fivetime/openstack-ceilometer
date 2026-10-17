@@ -450,3 +450,152 @@ metric:
       status: $.payload.status
       availability_zone: $.payload.availability_zone
       protocol: $.payload.proto
+
+  # Zun. Three kinds of object, three prefixes, never overlapping: a
+  # standalone container (container.*), a capsule as a whole (capsule.*),
+  # and a capsule's container (capsule.container.*, not defined here: its
+  # allocation is counted in its capsule's; see the release notes for
+  # definitions to add). Each sample is stamped with when the event
+  # happened (occurred_at), so a message delivered twice says the same
+  # thing twice. What was used comes from polling (ceilometer.container);
+  # these give what was allocated whenever it changes, how long each
+  # lived, and what one used up to the moment it was stopped or deleted.
+  - name: 'container.cpu'
+    event_type: &zun_container_events '^container\.(create|start|stop|pause|unpause|restart|rebuild|delete)\.end$|^container\.update$'
+    type: 'gauge'
+    unit: 'vcpu'
+    volume: $.payload.cpu
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.labels
+    metadata: &zun_meta
+      name: $.payload.name
+      host: $.payload.host
+      image: $.payload.image
+      runtime: $.payload.runtime
+      status: $.payload.status
+      container_type: $.payload.container_type
+
+  - name: 'container.memory'
+    event_type: *zun_container_events
+    type: 'gauge'
+    unit: 'MB'
+    volume: $.payload.memory
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.labels
+    metadata:
+      <<: *zun_meta
+
+  - name: 'container.disk'
+    event_type: *zun_container_events
+    type: 'gauge'
+    unit: 'GB'
+    volume: $.payload.disk
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.labels
+    metadata:
+      <<: *zun_meta
+
+  - name: 'container.lifetime'
+    event_type: '^container\.delete\.end$'
+    type: 'gauge'
+    unit: 's'
+    volume:
+      fields: [$.payload.started_at, $.payload.occurred_at]
+      plugin: 'timedelta'
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.labels
+    metadata:
+      <<: *zun_meta
+
+  - name: 'container.cpu.time'
+    event_type: '^container\.(stop|delete)\.end$'
+    type: 'cumulative'
+    unit: 'ns'
+    volume: $.payload.last_reading.cpu.total_ns
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.last_reading.timestamp
+    user_metadata: $.payload.labels
+    metadata:
+      <<: *zun_meta
+
+  - name: 'capsule.cpu'
+    event_type: &zun_capsule_events '^capsule\.(create|start|stop|pause|unpause|restart|rebuild|delete)\.end$|^capsule\.update$'
+    type: 'gauge'
+    unit: 'vcpu'
+    volume: $.payload.cpu
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.labels
+    metadata: &zun_capsule_meta
+      <<: *zun_meta
+      allocation_basis: $.payload.allocation_basis
+
+  - name: 'capsule.memory'
+    event_type: *zun_capsule_events
+    type: 'gauge'
+    unit: 'MB'
+    volume: $.payload.memory
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.labels
+    metadata:
+      <<: *zun_capsule_meta
+
+  - name: 'capsule.disk'
+    event_type: *zun_capsule_events
+    type: 'gauge'
+    unit: 'GB'
+    volume: $.payload.disk
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.labels
+    metadata:
+      <<: *zun_capsule_meta
+
+  - name: 'capsule.lifetime'
+    event_type: '^capsule\.delete\.end$'
+    type: 'gauge'
+    unit: 's'
+    volume:
+      fields: [$.payload.started_at, $.payload.occurred_at]
+      plugin: 'timedelta'
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.labels
+    metadata:
+      <<: *zun_capsule_meta
+
+  - name: 'capsule.cpu.time'
+    event_type: '^capsule\.(stop|delete)\.end$'
+    type: 'cumulative'
+    unit: 'ns'
+    volume: $.payload.last_reading.cpu.total_ns
+    user_id: $.payload.user_id
+    project_id: $.payload.project_id
+    resource_id: $.payload.uuid
+    timestamp: $.payload.last_reading.timestamp
+    user_metadata: $.payload.labels
+    metadata:
+      <<: *zun_capsule_meta

@@ -1,0 +1,36 @@
+---
+features:
+  - |
+    Zun containers and capsules are metered. Three kinds of object are
+    kept apart so none is counted twice: a standalone container
+    (``container.*``, resource type ``zun_container``), a capsule as a
+    whole (``capsule.*``, ``zun_capsule``) and a capsule's container
+    (``capsule.container.*``, ``zun_capsule_container``). Each has
+    ``cpu``, ``memory`` and ``disk`` (allocated), ``cpu.time``,
+    ``memory.usage``, network and disk bytes (used), and from
+    notifications ``lifetime`` and the last ``cpu.time`` reading on stop
+    and delete. Resources start and end with Zun's create and delete
+    events.
+  - |
+    New central pollsters read one Zun host per call
+    (``GET /v1/hosts/{host}/stats``, Zun API 1.56) through the discoveries
+    ``zun_containers``, ``zun_capsules`` and ``zun_capsule_containers``,
+    partitioned by host. A discovery parameter
+    ``label=<key>[=<value>]`` narrows a source to labelled objects. The
+    collector needs Zun's ``service`` role, not admin. How often a host
+    is read is up to the polling configuration; the archive policies
+    shipped suit the default five minutes.
+  - |
+    A capsule's containers are off by default: their allocation is counted
+    in their capsule's. To meter them, set
+    ``[zun] meter_capsule_containers = true``, add a
+    ``zun_capsule_container`` entry to ``gnocchi_resources.yaml`` with the
+    ``capsule.container.*`` metrics and the attributes ``capsule_uuid:
+    resource_metadata.capsule_uuid`` and ``allocation_included_in_parent:
+    resource_metadata.allocation_included_in_parent``, and, for their
+    events, definitions matching ``^capsule\.container\.`` like the
+    ``capsule.*`` ones.
+upgrade:
+  - |
+    Run ``ceilometer-upgrade`` to create the ``zun_container``,
+    ``zun_capsule`` and ``zun_capsule_container`` resource types.

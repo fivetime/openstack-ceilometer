@@ -22,6 +22,7 @@ import ceilometer.cmd.polling
 import ceilometer.compute.discovery
 import ceilometer.compute.virt.inspector
 import ceilometer.compute.virt.libvirt.utils
+import ceilometer.container.discovery
 import ceilometer.designate_client
 import ceilometer.event.converter
 import ceilometer.image.discovery
@@ -42,6 +43,7 @@ import ceilometer.publisher.utils
 import ceilometer.sample
 import ceilometer.utils
 import ceilometer.volume.discovery
+import ceilometer.zun_client
 
 
 OPTS = [
@@ -103,7 +105,9 @@ def list_opts():
                          ceilometer.nova_client.SERVICE_OPTS,
                          ceilometer.objectstore.rgw.SERVICE_OPTS,
                          ceilometer.objectstore.swift.SERVICE_OPTS,
-                         ceilometer.octavia_client.SERVICE_OPTS,))
+                         ceilometer.octavia_client.SERVICE_OPTS,
+                         ceilometer.zun_client.SERVICE_OPTS,)),
+        ('zun', ceilometer.container.discovery.OPTS),
     ]
 
 
