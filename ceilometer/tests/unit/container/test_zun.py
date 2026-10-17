@@ -349,6 +349,21 @@ class ShippedMeterDefinitionsTest(base.BaseTestCase):
         self.assertEqual({}, self._samples(
             _notification('container.create.start')))
 
+    def test_an_update_is_not_counted(self):
+        """Sent for a record not yet placed, or that never started too."""
+        self.assertEqual({}, self._samples(
+            _notification('container.update', status='Creating',
+                          host=None)))
+        self.assertEqual({}, self._samples(
+            _notification('capsule.update', container_type='capsule',
+                          status='Error')))
+
+    def test_a_resize_gives_what_is_held_after(self):
+        found = self._samples(_notification('container.resize.end',
+                                            memory='1024'))
+
+        self.assertEqual(1024, float(found['container.memory'].volume))
+
     def test_a_capsule_is_its_own(self):
         found = self._samples(_notification(
             'capsule.create.end', container_type='capsule',
