@@ -96,6 +96,37 @@ class DiscoveryTest(base.BaseTestCase):
             client.return_value.hosts.return_value = ['a', 'b']
             return cls(conf).discover(mock.Mock(), param)
 
+    def _beats(self, hosts):
+        manager = mock.Mock()
+        with mock.patch.object(zun_client, 'Client') as client:
+            if isinstance(hosts, Exception):
+                client.return_value.hosts.side_effect = hosts
+            else:
+                client.return_value.hosts.return_value = hosts
+            try:
+                discovery.ContainersDiscovery(_conf()).discover(manager)
+            except Exception:
+                pass
+        return [c.args[0] for c in manager.heartbeat.call_args_list]
+
+    def test_what_was_listed_goes_to_the_heartbeat(self):
+        self.assertEqual(['zun.hosts', 'zun.listed.a', 'zun.listed.b'],
+                         self._beats(['a', 'b']))
+
+    def test_an_empty_list_was_still_listed(self):
+        """No hosts is an answer; a failed listing is not."""
+        self.assertEqual(['zun.hosts'], self._beats([]))
+
+    def test_a_failed_listing_says_nothing(self):
+        self.assertEqual([], self._beats(RuntimeError('zun is down')))
+
+    def test_an_agent_without_a_heartbeat(self):
+        with mock.patch.object(zun_client, 'Client') as client:
+            client.return_value.hosts.return_value = ['a']
+            found = discovery.ContainersDiscovery(_conf()).discover(
+                object())
+        self.assertEqual(['a'], [str(h) for h in found])
+
     def test_a_host_is_the_unit_handed_out(self):
         found = self._discover(discovery.ContainersDiscovery)
 
@@ -234,6 +265,27 @@ class PollsterTest(base.BaseTestCase):
         for cls in (zun.ContainerNetworkIncomingBytesPollster,
                     zun.ContainerDiskReadBytesPollster):
             self.assertEqual([], self._samples(cls))
+
+    def test_a_read_goes_to_the_heartbeat_once_per_host_and_kind(self):
+        manager = mock.Mock()
+        cache = {}
+        for cls in (zun.ContainerCpuPollster, zun.ContainerMemoryPollster):
+            pollster = cls(self.conf)
+            pollster._client = self.client
+            list(pollster.get_samples(manager, cache, [self.host]))
+
+        self.assertEqual(['zun.read.container.node-1'],
+                         [c.args[0] for c in manager.heartbeat.call_args_list])
+
+    def test_a_failed_read_is_not_reported(self):
+        manager = mock.Mock()
+        self.client.host_stats.side_effect = RuntimeError('timed out')
+        pollster = zun.ContainerCpuPollster(self.conf)
+        pollster._client = self.client
+
+        list(pollster.get_samples(manager, {}, [self.host]))
+
+        manager.heartbeat.assert_not_called()
 
     def test_a_host_that_cannot_be_read_costs_only_itself(self):
         def answer(host, kinds, label=None):
