@@ -234,16 +234,31 @@ class PollsterTest(base.BaseTestCase):
         self.assertIn('bad', str(warning.call_args))
 
     def test_twenty_seven_pollsters_are_registered(self):
-        import tomllib
-        with open('pyproject.toml', 'rb') as f:
-            eps = tomllib.load(f)['project']['entry-points']
-        polls = {k: v for k, v in eps['ceilometer.poll.central'].items()
+        polls = {k: v for k, v in _central_pollsters().items()
                  if v.startswith('ceilometer.container.zun:')}
         self.assertEqual(27, len(polls))
         for name, target in polls.items():
             cls = getattr(zun, target.split(':')[1])
             self.assertEqual(name, '%s.%s' % (
                 zun.KINDS[cls.KIND]['prefix'], cls.METER))
+
+
+def _central_pollsters():
+    """ceilometer.poll.central as registered, wherever this branch keeps it.
+
+    pyproject.toml on master; setup.cfg on branches that predate the move.
+    """
+    import configparser
+    import tomllib
+    with open('pyproject.toml', 'rb') as f:
+        eps = tomllib.load(f).get('project', {}).get('entry-points', {})
+    if 'ceilometer.poll.central' in eps:
+        return dict(eps['ceilometer.poll.central'])
+    cfg = configparser.ConfigParser()
+    cfg.read('setup.cfg')
+    lines = cfg['entry_points']['ceilometer.poll.central'].splitlines()
+    return dict(tuple(p.strip() for p in line.split('=', 1))
+                for line in lines if '=' in line)
 
 
 def _notification(event_type, **payload):
