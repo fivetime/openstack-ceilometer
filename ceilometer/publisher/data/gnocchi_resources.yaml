@@ -338,3 +338,72 @@ resources:
     event_delete: dns.zone.delete
     event_attributes:
       id: resource_id
+
+  # Zun: a standalone container and a capsule as a whole. A capsule's
+  # containers (zun_capsule_container, capsule.container.*) are left out
+  # by default -- their allocation is counted in their capsule's -- and
+  # are added by an operator who bills per container.
+  - resource_type: zun_container
+    metrics:
+      container.cpu:
+      container.memory:
+      container.disk:
+      container.lifetime:
+      container.memory.usage:
+      container.cpu.time:
+        archive_policy_name: ceilometer-low-rate
+      container.network.incoming.bytes:
+        archive_policy_name: ceilometer-low-rate
+      container.network.outgoing.bytes:
+        archive_policy_name: ceilometer-low-rate
+      container.disk.read.bytes:
+        archive_policy_name: ceilometer-low-rate
+      container.disk.write.bytes:
+        archive_policy_name: ceilometer-low-rate
+    attributes: &zun_attributes
+      name: resource_metadata.name
+      host: resource_metadata.host
+      image: resource_metadata.image
+      runtime: resource_metadata.runtime
+      container_type: resource_metadata.container_type
+      status: resource_metadata.status
+      server_group: resource_metadata.user_metadata.server_group
+    event_create: container.create.end
+    event_delete: container.delete.end
+    event_attributes: &zun_event_attributes
+      id: resource_id
+      project_id: project_id
+      user_id: user_id
+      name: name
+      host: host
+      image: image
+      runtime: runtime
+      container_type: container_type
+      status: status
+      server_group: server_group
+
+  - resource_type: zun_capsule
+    metrics:
+      capsule.cpu:
+      capsule.memory:
+      capsule.disk:
+      capsule.lifetime:
+      capsule.memory.usage:
+      capsule.cpu.time:
+        archive_policy_name: ceilometer-low-rate
+      capsule.network.incoming.bytes:
+        archive_policy_name: ceilometer-low-rate
+      capsule.network.outgoing.bytes:
+        archive_policy_name: ceilometer-low-rate
+      capsule.disk.read.bytes:
+        archive_policy_name: ceilometer-low-rate
+      capsule.disk.write.bytes:
+        archive_policy_name: ceilometer-low-rate
+    attributes:
+      <<: *zun_attributes
+      allocation_basis: resource_metadata.allocation_basis
+    event_create: capsule.create.end
+    event_delete: capsule.delete.end
+    event_attributes:
+      <<: *zun_event_attributes
+      allocation_basis: allocation_basis

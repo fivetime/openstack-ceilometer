@@ -290,6 +290,74 @@ resources_update_operations = [
                         "max_length": 255, "required": False}
          }
      }]},
+    {"desc": "add zun_container resource type",
+     "type": "create_resource_type",
+     "resource_type": "zun_container",
+     "data": [{
+         "attributes": {
+             "name": {"type": "string", "min_length": 0,
+                      "max_length": 255, "required": False},
+             "host": {"type": "string", "min_length": 0,
+                      "max_length": 255, "required": False},
+             "image": {"type": "string", "min_length": 0,
+                       "max_length": 255, "required": False},
+             "runtime": {"type": "string", "min_length": 0,
+                         "max_length": 255, "required": False},
+             "container_type": {"type": "string", "min_length": 0,
+                                "max_length": 255, "required": False},
+             "status": {"type": "string", "min_length": 0,
+                        "max_length": 255, "required": False},
+             "server_group": {"type": "string", "min_length": 0,
+                              "max_length": 255, "required": False}
+         }
+     }]},
+    {"desc": "add zun_capsule resource type",
+     "type": "create_resource_type",
+     "resource_type": "zun_capsule",
+     "data": [{
+         "attributes": {
+             "name": {"type": "string", "min_length": 0,
+                      "max_length": 255, "required": False},
+             "host": {"type": "string", "min_length": 0,
+                      "max_length": 255, "required": False},
+             "image": {"type": "string", "min_length": 0,
+                       "max_length": 255, "required": False},
+             "runtime": {"type": "string", "min_length": 0,
+                         "max_length": 255, "required": False},
+             "container_type": {"type": "string", "min_length": 0,
+                                "max_length": 255, "required": False},
+             "status": {"type": "string", "min_length": 0,
+                        "max_length": 255, "required": False},
+             "server_group": {"type": "string", "min_length": 0,
+                              "max_length": 255, "required": False},
+             "allocation_basis": {"type": "string", "min_length": 0,
+                                  "max_length": 255, "required": False}
+         }
+     }]},
+    {"desc": "add zun_capsule_container resource type",
+     "type": "create_resource_type",
+     "resource_type": "zun_capsule_container",
+     "data": [{
+         "attributes": {
+             "name": {"type": "string", "min_length": 0,
+                      "max_length": 255, "required": False},
+             "host": {"type": "string", "min_length": 0,
+                      "max_length": 255, "required": False},
+             "image": {"type": "string", "min_length": 0,
+                       "max_length": 255, "required": False},
+             "runtime": {"type": "string", "min_length": 0,
+                         "max_length": 255, "required": False},
+             "container_type": {"type": "string", "min_length": 0,
+                                "max_length": 255, "required": False},
+             "status": {"type": "string", "min_length": 0,
+                        "max_length": 255, "required": False},
+             "server_group": {"type": "string", "min_length": 0,
+                              "max_length": 255, "required": False},
+             "capsule_uuid": {"type": "uuid", "required": False},
+             "allocation_included_in_parent": {"type": "bool",
+                                               "required": False}
+         }
+     }]},
 ]
 
 

@@ -696,3 +696,47 @@
     type:
       fields: payload.type
 
+- event_type: ['container.*']
+  traits: &zun_traits
+    resource_id:
+      fields: payload.uuid
+    project_id:
+      fields: payload.project_id
+    user_id:
+      fields: payload.user_id
+    name:
+      fields: payload.name
+    host:
+      fields: payload.host
+    image:
+      fields: payload.image
+    runtime:
+      fields: payload.runtime
+    container_type:
+      fields: payload.container_type
+    status:
+      fields: payload.status
+    server_group:
+      fields: payload.labels.'metering.server_group'
+    cpu:
+      type: float
+      fields: payload.cpu
+    memory:
+      fields: payload.memory
+    disk:
+      type: int
+      fields: payload.disk
+    created_at:
+      type: datetime
+      fields: payload.created_at
+    started_at:
+      type: datetime
+      fields: payload.started_at
+    occurred_at:
+      type: datetime
+      fields: payload.occurred_at
+- event_type: ['capsule.*', '!capsule.container.*']
+  traits:
+    <<: *zun_traits
+    allocation_basis:
+      fields: payload.allocation_basis

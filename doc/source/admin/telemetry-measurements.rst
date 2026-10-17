@@ -629,6 +629,91 @@ The following meters are collected for Octavia Load Balancer:
 |               |       |         |            |           | balancer         |
 +---------------+-------+---------+------------+-----------+------------------+
 
+Zun Container service
+~~~~~~~~~~~~~~~~~~~~~
+
+Three kinds of object, metered apart so that none is counted twice:
+
+* a standalone container: meters ``container.<name>``, resource type
+  ``zun_container``;
+* a capsule, read as a whole from its sandbox: ``capsule.<name>``,
+  ``zun_capsule``;
+* a capsule's container, init containers included:
+  ``capsule.container.<name>``, ``zun_capsule_container``. Its allocation is
+  already counted in its capsule's (a capsule's allocation follows k8s and
+  is not the sum of its containers), so it is off by default; set
+  ``[zun] meter_capsule_containers`` and add its definitions to meter it.
+
+Each kind has the meters below. The pollsters read one Zun host per call
+(``GET /v1/hosts/{host}/stats``, Zun API 1.56, which the service role may
+call) and partition by host. ``zun_containers://label=<key>[=<value>]``
+narrows a source to objects carrying a label, for a short interval only
+for what autoscales. Labels prefixed with a reserved namespace
+(``metering.`` by default) arrive as ``user_metadata``, as an instance's
+metadata does. Notification samples are stamped with when the event
+happened.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 12 8 25 30
+
+   * - Name
+     - Type
+     - Unit
+     - Origin
+     - Note
+   * - cpu
+     - Gauge
+     - vcpu
+     - Pollster, Notification
+     - CPUs allocated
+   * - memory
+     - Gauge
+     - MB
+     - Pollster, Notification
+     - Memory allocated
+   * - disk
+     - Gauge
+     - GB
+     - Pollster, Notification
+     - Disk allocated
+   * - lifetime
+     - Gauge
+     - s
+     - Notification
+     - How long it lived, on delete; stamped with when it was deleted
+   * - cpu.time
+     - Cumulative
+     - ns
+     - Pollster, Notification
+     - CPU time used; also the last reading on stop and delete
+   * - memory.usage
+     - Gauge
+     - MB
+     - Pollster
+     - Working set (usage less inactive page cache)
+   * - network.incoming.bytes
+     - Cumulative
+     - B
+     - Pollster
+     - Bytes received
+   * - network.outgoing.bytes
+     - Cumulative
+     - B
+     - Pollster
+     - Bytes sent
+   * - disk.read.bytes
+     - Cumulative
+     - B
+     - Pollster
+     - Bytes read
+   * - disk.write.bytes
+     - Cumulative
+     - B
+     - Pollster
+     - Bytes written
+
+
 Designate DNS
 ~~~~~~~~~~~~~
 
