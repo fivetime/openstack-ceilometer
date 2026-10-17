@@ -99,6 +99,16 @@ class ReconcileTest(base.BaseTestCase):
 
         self.assertEqual(['c'], [rid for _, rid, _ in ended])
 
+    def test_measures_waiting_to_be_aggregated_count(self):
+        """A dry run and the run after it name the same time."""
+        self.open['zun_container'] = [_resource('gone')]
+
+        self._run(dry_run=True)
+
+        self.assertTrue(all(
+            c.kwargs.get('refresh')
+            for c in self.gnocchi.metric.get_measures.call_args_list))
+
     def test_never_measured_ends_when_it_started(self):
         self.open['zun_container'] = [_resource('quiet', metrics={})]
 
