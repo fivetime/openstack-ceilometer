@@ -60,11 +60,17 @@ def _open_resources(gnocchi, resource_type, page=1000):
 
 
 def _last_seen(gnocchi, resource):
-    """The latest measure of any of its metrics, or when it started."""
+    """The latest measure of any of its metrics, or when it started.
+
+    Measures not yet aggregated count too (refresh): without them a dry
+    run and the run after it could name different times, and the last
+    point -- the one a lost delete leaves -- is the likeliest to be still
+    waiting. Only resources already found gone are read, so it is cheap.
+    """
     latest = None
     for metric_id in (resource.get('metrics') or {}).values():
         try:
-            measures = gnocchi.metric.get_measures(metric_id, refresh=False)
+            measures = gnocchi.metric.get_measures(metric_id, refresh=True)
         except Exception as exc:
             LOG.debug('no measures for %s: %s', metric_id, exc)
             continue
