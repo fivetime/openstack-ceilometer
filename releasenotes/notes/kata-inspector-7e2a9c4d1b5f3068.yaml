@@ -1,0 +1,12 @@
+---
+features:
+  - |
+    A Kata Containers inspector, ``hypervisor_inspector = kata``, polls the
+    instances of the openstack-nova-kata compute driver. It reads the
+    host's nova-kata-runtime gateway over its Unix socket
+    (``[DEFAULT] kata_runtime_socket``) and gives the libvirt inspector's
+    meters of an instance: ``cpu``, ``memory.usage``, ``network.*`` and
+    ``disk.device.*`` of Cinder disks and block roots, named as libvirt
+    names them. The gateway has no counter for disk latency, capacity,
+    allocation and usage, nor for memory residency and swap; leave those
+    meters out of the Kata compute agent's polling file.
