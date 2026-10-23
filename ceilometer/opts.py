@@ -20,6 +20,7 @@ from oslo_config import cfg
 import ceilometer.alarm.discovery
 import ceilometer.cmd.polling
 import ceilometer.compute.discovery
+import ceilometer.compute.virt.incus.inspector
 import ceilometer.compute.virt.inspector
 import ceilometer.compute.virt.kata.inspector
 import ceilometer.compute.virt.libvirt.utils
@@ -88,6 +89,7 @@ def list_opts():
                 'single instance of that service is running.')
         ]),
         ('event', ceilometer.event.converter.OPTS),
+        ('incus', ceilometer.compute.virt.incus.inspector.OPTS),
         ('ipmi', ceilometer.ipmi.pollsters.OPTS),
         ('meter', ceilometer.meter.notifications.OPTS),
         ('notification',
