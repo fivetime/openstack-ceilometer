@@ -29,7 +29,8 @@ OPTS = [
                help='Inspector to use for inspecting the hypervisor layer: '
                     'the name of an entry point of the '
                     'ceilometer.compute.virt namespace. Ceilometer ships '
-                    'libvirt; a compute driver can register its own.')
+                    'incus, kata and libvirt; a compute driver can register '
+                    'its own.')
 ]
 
 
