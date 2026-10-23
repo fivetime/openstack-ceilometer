@@ -21,6 +21,7 @@ import ceilometer.alarm.discovery
 import ceilometer.cmd.polling
 import ceilometer.compute.discovery
 import ceilometer.compute.virt.inspector
+import ceilometer.compute.virt.kata.inspector
 import ceilometer.compute.virt.libvirt.utils
 import ceilometer.designate_client
 import ceilometer.event.converter
@@ -65,6 +66,7 @@ def list_opts():
         ('DEFAULT',
          itertools.chain(ceilometer.cmd.polling.CLI_OPTS,
                          ceilometer.compute.virt.inspector.OPTS,
+                         ceilometer.compute.virt.kata.inspector.OPTS,
                          ceilometer.compute.virt.libvirt.utils.OPTS,
                          ceilometer.objectstore.swift.OPTS,
                          ceilometer.pipeline.base.OPTS,

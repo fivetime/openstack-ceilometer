@@ -194,6 +194,7 @@ local_node = "ceilometer.polling.discovery.localnode:LocalNodeDiscovery"
 "manila.share.size" = "ceilometer.share.manila:ShareSizePollster"
 
 [project.entry-points."ceilometer.compute.virt"]
+kata = "ceilometer.compute.virt.kata.inspector:KataInspector"
 libvirt = "ceilometer.compute.virt.libvirt.inspector:LibvirtInspector"
 
 [project.entry-points."ceilometer.sample.publisher"]
