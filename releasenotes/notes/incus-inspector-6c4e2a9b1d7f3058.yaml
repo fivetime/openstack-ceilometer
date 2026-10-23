@@ -1,0 +1,15 @@
+---
+features:
+  - |
+    A compute inspector for Incus system containers, selected with
+    ``[DEFAULT] hypervisor_inspector = incus``. It reads the CPU time,
+    memory and vNIC counters of every running instance from the local Incus
+    server's ``/1.0/metrics`` endpoint in one request per polling cycle.
+    Set ``[incus] metrics_url`` and trust ``[incus] client_cert`` in Incus
+    with type ``metrics``, which grants that endpoint and nothing else.
+    vNICs are named after the host tap, as libvirt names them. Incus
+    publishes no metrics for a stopped instance, so it produces no samples,
+    as libvirt does by default; ``[compute]
+    report_stopped_instance_metrics`` has no effect. Disk metrics are not
+    reported yet. Discover instances with ``[compute]
+    instance_discovery_method = naive``.
