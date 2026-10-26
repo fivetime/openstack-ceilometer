@@ -106,7 +106,6 @@ class TestKataInspector(base.BaseTestCase):
         self.assertEqual(3000, stats.cpu_time)
         self.assertEqual(2048, stats.memory_actual)
         self.assertEqual(512, stats.memory_usage)
-        self.assertEqual(15, stats.cpu_delay)
         self.assertEqual(300, stats.memory_resident)
         # The instance's own container, not a rescue one.
         self.assertEqual(
@@ -135,8 +134,6 @@ class TestKataInspector(base.BaseTestCase):
     def test_a_gateway_without_the_new_counters_reports_none(self):
         data = diagnostics()
         del data['memory_resident_bytes']
-        for vcpu in data['vcpus']:
-            del vcpu['delay_ns']
         for disk in data['disks']:
             disk.pop('capacity_bytes')
             disk.pop('allocation_bytes', None)
@@ -144,7 +141,6 @@ class TestKataInspector(base.BaseTestCase):
             '/v1/instances/%s/diagnostics?generation=%s' % (
                 UUID, GENERATION)] = (200, data)
         stats = self.inspector.inspect_instance(self.instance, None)
-        self.assertIsNone(stats.cpu_delay)
         self.assertIsNone(stats.memory_resident)
         self.assertEqual(
             [], list(self.inspector.inspect_disk_info(self.instance, None)))

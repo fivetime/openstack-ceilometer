@@ -20,12 +20,12 @@ the guest workload's memory. The samples are the libvirt inspector's meters
 of an instance (cpu, memory.usage, network.*, disk.device.*), named as
 libvirt names them, so nothing downstream tells the hypervisors apart.
 
-The gateway also reports each vCPU's wait for a CPU (cpu_delay), the VMM
-process's resident memory (memory.resident) and each disk's size
-(disk.device.capacity); a file root's allocation on the host's filesystem
-(disk.device.allocation and usage) too, an RBD image's not, as it would
-take a walk of its objects. It has no counter for disk latency nor for
-memory swap.
+The gateway also reports the VMM process's resident memory
+(memory.resident) and each disk's size (disk.device.capacity); a file
+root's allocation on the host's filesystem (disk.device.allocation and
+usage) too, an RBD image's not, as it would take a walk of its objects.
+It has no counter for disk latency nor for memory swap. Its vCPU wait for
+a CPU is not read: this release has no cpu_delay meter.
 """
 
 import http.client
@@ -191,10 +191,6 @@ class KataInspector(virt_inspector.Inspector):
         flavor = getattr(instance, 'flavor', None) or {}
         vcpus = data.get('vcpus') or []
         cpu_time = sum(vcpu['time_ns'] for vcpu in vcpus) if vcpus else None
-        # A gateway without the field reports no delay, not a zero one.
-        delays = [vcpu['delay_ns'] for vcpu in vcpus if 'delay_ns' in vcpu]
-        cpu_delay = sum(delays) if vcpus and len(delays) == len(vcpus) \
-            else None
         memory = flavor.get('ram')
         used = data.get('memory_usage_bytes')
         resident = data.get('memory_resident_bytes')
@@ -202,7 +198,6 @@ class KataInspector(virt_inspector.Inspector):
             power_state=POWER_STATE[data['task_status']],
             cpu_number=len(vcpus) or flavor.get('vcpus'),
             cpu_time=cpu_time,
-            cpu_delay=cpu_delay,
             memory_actual=memory,
             memory_available=memory,
             memory_usage=used / MIB if used is not None else None,
