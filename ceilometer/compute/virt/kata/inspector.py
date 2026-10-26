@@ -20,9 +20,12 @@ the guest workload's memory. The samples are the libvirt inspector's meters
 of an instance (cpu, memory.usage, network.*, disk.device.*), named as
 libvirt names them, so nothing downstream tells the hypervisors apart.
 
-The gateway has no counter for disk latency, capacity, allocation and
-usage, nor for memory residency and swap; a file root (not a block device)
-has no disk counters.
+The gateway also reports the VMM process's resident memory
+(memory.resident) and each disk's size (disk.device.capacity); a file
+root's allocation on the host's filesystem (disk.device.allocation and
+usage) too, an RBD image's not, as it would take a walk of its objects.
+It has no counter for disk latency nor for memory swap. Its vCPU wait for
+a CPU is not read: this release has no cpu_delay meter.
 """
 
 import http.client
@@ -190,6 +193,7 @@ class KataInspector(virt_inspector.Inspector):
         cpu_time = sum(vcpu['time_ns'] for vcpu in vcpus) if vcpus else None
         memory = flavor.get('ram')
         used = data.get('memory_usage_bytes')
+        resident = data.get('memory_resident_bytes')
         return virt_inspector.InstanceStats(
             power_state=POWER_STATE[data['task_status']],
             cpu_number=len(vcpus) or flavor.get('vcpus'),
@@ -197,6 +201,7 @@ class KataInspector(virt_inspector.Inspector):
             memory_actual=memory,
             memory_available=memory,
             memory_usage=used / MIB if used is not None else None,
+            memory_resident=resident / MIB if resident is not None else None,
         )
 
     def inspect_vnics(self, instance, duration):
@@ -220,17 +225,35 @@ class KataInspector(virt_inspector.Inspector):
                 tx_bytes_delta=None,
             )
 
+    @staticmethod
+    def _device(instance, disk):
+        """A disk's name as libvirt names it: the root's, a volume's."""
+        if disk.get('root'):
+            device = getattr(instance, 'OS-EXT-SRV-ATTR:root_device_name',
+                             None) or '/dev/vda'
+        else:
+            device = disk.get('device') or disk['volume_uuid']
+        return device.rsplit('/', 1)[-1]
+
+    def inspect_disk_info(self, instance, duration):
+        data = self._running(instance)
+        for disk in data.get('disks') or []:
+            capacity = disk.get('capacity_bytes')
+            if not capacity:
+                continue
+            allocation = disk.get('allocation_bytes')
+            yield virt_inspector.DiskInfo(
+                device=self._device(instance, disk),
+                capacity=capacity,
+                allocation=allocation,
+                physical=allocation,
+            )
+
     def inspect_disks(self, instance, duration):
         data = self._running(instance)
-        root_name = getattr(
-            instance, 'OS-EXT-SRV-ATTR:root_device_name', None) or '/dev/vda'
         for disk in data.get('disks') or []:
-            if disk.get('root'):
-                device = root_name
-            else:
-                device = disk.get('device') or disk['volume_uuid']
             yield virt_inspector.DiskStats(
-                device=device.rsplit('/', 1)[-1],
+                device=self._device(instance, disk),
                 read_bytes=disk['read_bytes'],
                 read_requests=disk['read_requests'],
                 write_bytes=disk['write_bytes'],

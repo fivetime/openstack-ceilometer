@@ -46,18 +46,24 @@ def diagnostics(task_status='running'):
         'protocol_version': 1, 'instance_uuid': UUID,
         'generation': GENERATION, 'task_status': task_status,
         'memory_usage_bytes': 512 * 1024 ** 2 if running else None,
-        'vcpus': [{'id': 0, 'time_ns': 1000},
-                  {'id': 1, 'time_ns': 2000}] if running else [],
+        'memory_resident_bytes': 300 * 1024 ** 2 if running else None,
+        'vcpus': [{'id': 0, 'time_ns': 1000, 'delay_ns': 7},
+                  {'id': 1, 'time_ns': 2000, 'delay_ns': 8}]
+        if running else [],
         'nics': [{'port_id': PORT, 'mac_address': 'FA:16:3E:00:00:01',
                   'rx_bytes': 1, 'rx_packets': 2, 'rx_errors': 3,
                   'rx_drop': 4, 'tx_bytes': 5, 'tx_packets': 6,
                   'tx_errors': 7, 'tx_drop': 8}] if running else [],
+        # A file root, with its allocation; a volume, a block device.
         'disks': [{'root': True, 'read_bytes': 10, 'read_requests': 1,
-                   'write_bytes': 20, 'write_requests': 2},
+                   'write_bytes': 20, 'write_requests': 2,
+                   'capacity_bytes': 10 * 1024 ** 3,
+                   'allocation_bytes': 3 * 1024 ** 3},
                   {'root': False, 'volume_uuid': 'volume-1',
                    'device': '/dev/sdb', 'read_bytes': 30,
                    'read_requests': 3, 'write_bytes': 40,
-                   'write_requests': 4}] if running else [],
+                   'write_requests': 4,
+                   'capacity_bytes': 20 * 1024 ** 3}] if running else [],
     }
 
 
@@ -100,6 +106,7 @@ class TestKataInspector(base.BaseTestCase):
         self.assertEqual(3000, stats.cpu_time)
         self.assertEqual(2048, stats.memory_actual)
         self.assertEqual(512, stats.memory_usage)
+        self.assertEqual(300, stats.memory_resident)
         # The instance's own container, not a rescue one.
         self.assertEqual(
             '/v1/instances/%s/diagnostics?generation=%s' % (UUID, GENERATION),
@@ -116,6 +123,27 @@ class TestKataInspector(base.BaseTestCase):
         disks = list(self.inspector.inspect_disks(self.instance, None))
         self.assertEqual([('sda', 20), ('sdb', 40)],
                          [(d.device, d.write_bytes) for d in disks])
+
+    def test_disk_info_has_the_size_and_a_file_roots_allocation(self):
+        info = list(self.inspector.inspect_disk_info(self.instance, None))
+        self.assertEqual(
+            [('sda', 10 * 1024 ** 3, 3 * 1024 ** 3, 3 * 1024 ** 3),
+             ('sdb', 20 * 1024 ** 3, None, None)],
+            [(d.device, d.capacity, d.allocation, d.physical) for d in info])
+
+    def test_a_gateway_without_the_new_counters_reports_none(self):
+        data = diagnostics()
+        del data['memory_resident_bytes']
+        for disk in data['disks']:
+            disk.pop('capacity_bytes')
+            disk.pop('allocation_bytes', None)
+        self.gateway.answers[
+            '/v1/instances/%s/diagnostics?generation=%s' % (
+                UUID, GENERATION)] = (200, data)
+        stats = self.inspector.inspect_instance(self.instance, None)
+        self.assertIsNone(stats.memory_resident)
+        self.assertEqual(
+            [], list(self.inspector.inspect_disk_info(self.instance, None)))
 
     def test_one_read_serves_the_pollsters_of_a_cycle(self):
         self.inspector.inspect_instance(self.instance, None)
