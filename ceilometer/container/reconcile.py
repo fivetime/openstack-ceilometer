@@ -27,6 +27,10 @@ A host that could not be read is left alone entirely: not being able to
 ask is not an answer. A resource that started after the reading began,
 less a margin, is left alone too: it may have been created after its host
 was read.
+
+One resource Gnocchi will not end does not stop the rest: it is logged,
+the others are ended, and the run then fails naming it, so that the job
+that runs this still shows that something was left open.
 """
 
 import datetime
@@ -46,6 +50,16 @@ MARGIN = datetime.timedelta(minutes=10)
 ENDED_BY = 'reconcile'
 
 
+class Incomplete(Exception):
+    """Some resources could not be ended; the rest were."""
+
+    def __init__(self, ended, failed):
+        self.ended = ended
+        self.failed = failed
+        super().__init__('%d Zun resource(s) could not be ended: %s' % (
+            len(failed), ', '.join(rid for _, rid, _ in failed)))
+
+
 def _open_resources(gnocchi, resource_type, page=1000):
     marker = None
     while True:
@@ -61,6 +75,12 @@ def _open_resources(gnocchi, resource_type, page=1000):
 
 def _last_seen(gnocchi, resource):
     """The latest measure of any of its metrics, or when it started.
+
+    Never earlier than it started. A measure is stamped with the start of
+    its granularity bucket, so a resource created part way into a bucket
+    and gone before the next has its last measure before its start -- and
+    Gnocchi refuses an ended_at before started_at (400), which used to stop
+    the whole run at that resource, every run.
 
     Measures not yet aggregated count too (refresh): without them a dry
     run and the run after it could name different times, and the last
@@ -81,6 +101,9 @@ def _last_seen(gnocchi, resource):
             if latest is None or stamp > latest:
                 latest = stamp
     if latest is None:
+        return resource['started_at']
+    started = timeutils.parse_isotime(str(resource['started_at']))
+    if latest < started:
         return resource['started_at']
     return latest.isoformat()
 
@@ -114,6 +137,7 @@ def reconcile(zun, gnocchi, now=None, dry_run=False):
     present = _present(zun, hosts)
     cutoff = began - MARGIN
     ended = []
+    failed = []
     for resource_type in RESOURCE_TYPES:
         for resource in _open_resources(gnocchi, resource_type):
             host = resource.get('host')
@@ -125,13 +149,23 @@ def reconcile(zun, gnocchi, now=None, dry_run=False):
             if started > cutoff:
                 continue
             ended_at = _last_seen(gnocchi, resource)
-            ended.append((resource_type, resource['id'], ended_at))
             LOG.info('%(type)s %(id)s is gone from Zun; ending it at '
                      '%(at)s, when it was last seen',
                      {'type': resource_type, 'id': resource['id'],
                       'at': ended_at})
             if not dry_run:
-                gnocchi.resource.update(resource_type, resource['id'],
-                                        {'ended_at': ended_at,
-                                         'ended_by': ENDED_BY})
+                try:
+                    gnocchi.resource.update(resource_type, resource['id'],
+                                            {'ended_at': ended_at,
+                                             'ended_by': ENDED_BY})
+                except Exception as exc:
+                    LOG.error('%(type)s %(id)s could not be ended at '
+                              '%(at)s: %(err)s',
+                              {'type': resource_type, 'id': resource['id'],
+                               'at': ended_at, 'err': exc})
+                    failed.append((resource_type, resource['id'], ended_at))
+                    continue
+            ended.append((resource_type, resource['id'], ended_at))
+    if failed:
+        raise Incomplete(ended, failed)
     return ended

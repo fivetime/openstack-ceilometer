@@ -130,3 +130,31 @@ class ReconcileTest(base.BaseTestCase):
         for call in self.gnocchi.resource.search.call_args_list:
             self.assertEqual({'=': {'ended_at': None}},
                              call.kwargs['query'])
+
+    def test_a_last_measure_before_the_start_ends_it_when_it_started(self):
+        """A measure is stamped with the start of its bucket.
+
+        Created at 00:30:47 and gone before 00:31, its last measure reads
+        00:30:00 -- before it started, which Gnocchi refuses (400).
+        """
+        started = '2026-10-17T09:55:47+00:00'
+        self.open['zun_container'] = [_resource('brief', started=started)]
+
+        ended = self._run()
+
+        self.assertEqual([('zun_container', 'brief', started)], ended)
+
+    def test_one_gnocchi_refuses_does_not_stop_the_rest(self):
+        self.open['zun_container'] = [_resource('refused'), _resource('ok')]
+        self.open['zun_capsule'] = [_resource('cap')]
+
+        def update(resource_type, rid, attrs):
+            if rid == 'refused':
+                raise RuntimeError('HTTP 400')
+        self.gnocchi.resource.update.side_effect = update
+
+        exc = self.assertRaises(reconcile.Incomplete, self._run)
+
+        self.assertEqual(['ok', 'cap'], [rid for _, rid, _ in exc.ended])
+        self.assertEqual(['refused'], [rid for _, rid, _ in exc.failed])
+        self.assertEqual(3, self.gnocchi.resource.update.call_count)

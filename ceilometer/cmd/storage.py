@@ -13,6 +13,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import sys
+
 from oslo_config import cfg
 from oslo_log import log
 import tenacity
@@ -67,9 +69,14 @@ def zun_reconcile():
     from ceilometer.container import reconcile
     from ceilometer import gnocchi_client
     from ceilometer import zun_client
-    ended = reconcile.reconcile(zun_client.Client(conf),
-                                gnocchi_client.get_gnocchiclient(conf),
-                                dry_run=conf.dry_run)
+    try:
+        ended = reconcile.reconcile(zun_client.Client(conf),
+                                    gnocchi_client.get_gnocchiclient(conf),
+                                    dry_run=conf.dry_run)
+    except reconcile.Incomplete as exc:
+        LOG.info('%d Zun resource(s) ended', len(exc.ended))
+        LOG.error('%s', exc)
+        sys.exit(1)
     LOG.info('%(n)d Zun resource(s) %(verb)s', {
         'n': len(ended),
         'verb': 'would be ended' if conf.dry_run else 'ended'})
