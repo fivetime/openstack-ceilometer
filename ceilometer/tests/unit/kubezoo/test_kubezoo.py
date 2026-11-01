@@ -151,6 +151,7 @@ class PollsterTest(base.BaseTestCase):
             self.assertEqual('kata', md['runtime_class'])
             self.assertEqual('scheduler', md['allocation_basis'])
             self.assertEqual({'cost-center': 'r-and-d'}, md['user_metadata'])
+            self.assertEqual('2026-11-01T10:00:17.250000Z', md['started_at'])
 
     def test_one_read_per_node_per_cycle(self):
         cache = {}
@@ -309,6 +310,11 @@ class DefinitionsTest(base.BaseTestCase):
         made = self._samples(create)
         self.assertEqual(['k8s.pod.cpu', 'k8s.pod.disk', 'k8s.pod.memory'],
                          sorted(s.name for s in made))
+        # Whichever reaches Gnocchi first creates the resource, so a sample
+        # must carry the real start as well as the event does.
+        for s in made:
+            self.assertEqual(create['payload']['started_at'],
+                             rd.sample_attributes(s)['started_at'])
         ends = self._samples(delete)
         self.assertEqual(['k8s.pod.lifetime'], [s.name for s in ends])
         self.assertEqual((ended - started).total_seconds(), ends[0].volume)

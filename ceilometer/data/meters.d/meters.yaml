@@ -621,6 +621,9 @@ metric:
     timestamp: $.payload.occurred_at
     user_metadata: $.payload.metering
     metadata: &k8s_pod_meta
+      # started_at is here so that the resource gets the pod's real start
+      # even when this sample, not the create event, is what creates it.
+      started_at: $.payload.started_at
       name: $.payload.name
       namespace: $.payload.namespace
       tenant_id: $.payload.tenant_id
