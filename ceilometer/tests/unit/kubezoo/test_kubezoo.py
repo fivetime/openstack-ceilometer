@@ -19,6 +19,7 @@ from oslo_messaging._drivers import impl_kafka
 from oslo_utils import timeutils
 from oslotest import base
 from stevedore import extension
+import ujson
 import yaml
 
 from ceilometer import declarative
@@ -303,8 +304,13 @@ class DefinitionsTest(base.BaseTestCase):
         rd = gnocchi.ResourcesDefinition(rd_cfg, 'low', {}, self.traits)
         attrs = rd.event_attributes(ce)
         self.assertEqual(create['payload']['pod_uid'], attrs['id'])
-        self.assertEqual(timeutils.normalize_time(started),
+        self.assertEqual(timeutils.normalize_time(started).isoformat(),
                          attrs['started_at'])
+        self.assertEqual(traits['platform_workload'],
+                         attrs['platform_workload'])
+        # What the Gnocchi client does with these. A datetime here makes it
+        # raise, and the pod's resource is left to the samples to create.
+        ujson.dumps(attrs)
         self.assertEqual('k8s.pod.delete.end', rd_cfg['event_delete'])
 
         made = self._samples(create)
@@ -315,6 +321,8 @@ class DefinitionsTest(base.BaseTestCase):
         for s in made:
             self.assertEqual(create['payload']['started_at'],
                              rd.sample_attributes(s)['started_at'])
+            # The attribute is a string, and a JSON bool would be refused.
+            self.assertNotIn('platform_workload', rd.sample_attributes(s))
         ends = self._samples(delete)
         self.assertEqual(['k8s.pod.lifetime'], [s.name for s in ends])
         self.assertEqual((ended - started).total_seconds(), ends[0].volume)

@@ -631,7 +631,6 @@ metric:
       pool: $.payload.pool
       runtime_class: $.payload.runtime_class
       qos_class: $.payload.qos_class
-      platform_workload: $.payload.platform_workload
       owner_kind: $.payload.owner_kind
       owner_name: $.payload.owner_name
       status: $.payload.phase

@@ -433,8 +433,10 @@ resources:
       pool: resource_metadata.pool
       runtime_class: resource_metadata.runtime_class
       qos_class: resource_metadata.qos_class
-      # platform_workload is set from events only: a sample carries it as a
-      # JSON bool, and the attribute is a string; the event trait is text.
+      # Only the pollsters' samples carry this, already as text. Without it a
+      # resource created by a sample before its create event never gets it,
+      # because that event is then ignored as a duplicate.
+      platform_workload: resource_metadata.platform_workload
       owner_kind: resource_metadata.owner_kind
       owner_name: resource_metadata.owner_name
       status: resource_metadata.status
