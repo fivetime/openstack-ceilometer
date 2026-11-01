@@ -1,0 +1,9 @@
+---
+fixes:
+  - |
+    The Zun pollsters report what a container or capsule holds whether or not
+    the runtime can read it: ``container.cpu``, ``.memory``, ``.disk`` and
+    their ``capsule.*`` counterparts go on for a stopped container or a
+    capsule on a dead sandbox, and stop during a first start, where Zun's
+    ``allocation_counts`` says so. Against a Zun without that field nothing
+    changes.
