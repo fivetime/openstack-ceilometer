@@ -30,6 +30,7 @@ import ceilometer.event.converter
 import ceilometer.image.discovery
 import ceilometer.ipmi.pollsters
 import ceilometer.keystone_client
+import ceilometer.kubezoo_client
 import ceilometer.manila_client
 import ceilometer.meter.notifications
 import ceilometer.neutron_client
@@ -90,6 +91,7 @@ def list_opts():
         ]),
         ('event', ceilometer.event.converter.OPTS),
         ('incus', ceilometer.compute.virt.incus.inspector.OPTS),
+        ('kubezoo', ceilometer.kubezoo_client.OPTS),
         ('ipmi', ceilometer.ipmi.pollsters.OPTS),
         ('meter', ceilometer.meter.notifications.OPTS),
         ('notification',

@@ -364,6 +364,21 @@ resources_update_operations = [
                                                "required": False}
          }
      }]},
+    {"desc": "add k8s_pod resource type",
+     "type": "create_resource_type",
+     "resource_type": "k8s_pod",
+     "data": [{
+         "attributes": {
+             attr: {"type": "string", "min_length": 0, "max_length": 255,
+                    "required": False}
+             # tenant_id is kubezoo's six-character id, not a project.
+             # platform_workload is "True"/"False": a trait has no bool.
+             for attr in ("name", "namespace", "tenant_id", "node", "pool",
+                          "runtime_class", "qos_class", "platform_workload",
+                          "owner_kind", "owner_name", "status",
+                          "allocation_basis", "ended_by")
+         }
+     }]},
 ]
 
 
