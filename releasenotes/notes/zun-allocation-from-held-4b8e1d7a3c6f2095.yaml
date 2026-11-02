@@ -1,0 +1,11 @@
+---
+upgrade:
+  - |
+    The ``container.cpu``, ``memory`` and ``disk`` and ``capsule.cpu``,
+    ``memory`` and ``disk`` meters built from Zun's notifications now read
+    ``payload.held``. Upgrade Zun first: without that field those
+    notifications give no allocation samples, though polling still does.
+fixes:
+  - |
+    Deleting a Zun container or capsule that failed its first start no
+    longer records one more period of its allocation.

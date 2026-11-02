@@ -377,6 +377,7 @@ def _notification(event_type, **payload):
         'tenant_id': 'p-1', 'project_id': 'p-1', 'host': 'node-1',
         'image': 'img', 'status': 'Running', 'task_state': None,
         'cpu': 1.0, 'memory': '512', 'disk': 10, 'runtime': 'kata-qemu',
+        'held': {'cpu': 1.0, 'memory': '512', 'disk': 10},
         'created_at': '2026-10-17T00:00:00+00:00',
         'started_at': '2026-10-17T00:00:10+00:00',
         'labels': {'metering.server_group': 'web'},
@@ -450,10 +451,33 @@ class ShippedMeterDefinitionsTest(base.BaseTestCase):
                           status='Error')))
 
     def test_a_resize_gives_what_is_held_after(self):
-        found = self._samples(_notification('container.resize.end',
-                                            memory='1024'))
+        found = self._samples(_notification(
+            'container.resize.end', memory='1024',
+            held={'cpu': 1.0, 'memory': '1024', 'disk': 10}))
 
         self.assertEqual(1024, float(found['container.memory'].volume))
+
+    def test_what_holds_nothing_counts_nothing(self):
+        """Deleting what failed its first start bills no last minute.
+
+        Nor anything else that would make a resource for it: a sample with
+        no volume is dropped before it gets that far.
+        """
+        for event, kind in (('container.delete.end', 'container'),
+                            ('capsule.delete.end', 'capsule')):
+            found = self._samples(_notification(
+                event, container_type=kind, status='Deleted', held=None,
+                started_at=None))
+
+            self.assertTrue(found)
+            for name, sample in found.items():
+                self.assertIsNone(sample.volume, name)
+
+    def test_what_was_held_until_the_delete_counts(self):
+        found = self._samples(_notification('capsule.delete.end',
+                                            container_type='capsule'))
+
+        self.assertEqual(1.0, found['capsule.cpu'].volume)
 
     def test_a_capsule_is_its_own(self):
         found = self._samples(_notification(
