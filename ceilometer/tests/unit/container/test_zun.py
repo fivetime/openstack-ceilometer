@@ -227,6 +227,45 @@ class PollsterTest(base.BaseTestCase):
         self.assertEqual(7, one(zun.ContainerDiskReadBytesPollster))
         self.assertEqual(8, one(zun.ContainerDiskWriteBytesPollster))
 
+    def _held(self, **kw):
+        row = _entry('c-2', 'container', status='Stopped',
+                     read_at='2026-10-17T01:05:00+00:00',
+                     reason='the runtime gave no reading',
+                     allocation_counts=True, **kw)
+        del row['reading']
+        return row
+
+    def _only_unavailable(self, *rows):
+        self.client.host_stats.return_value = {
+            'results': [], 'unavailable': list(rows)}
+
+    def test_a_stopped_container_is_charged_for_what_it_holds(self):
+        self._only_unavailable(self._held())
+        (s,) = self._samples(zun.ContainerCpuPollster)
+        self.assertEqual((1.0, 'c-2'), (s.volume, s.resource_id))
+        self.assertEqual('2026-10-17T01:05:00+00:00', s.timestamp)
+        self.assertEqual('Stopped', s.resource_metadata['status'])
+
+    def test_a_stopped_container_claims_no_usage(self):
+        self._only_unavailable(self._held())
+        self.assertEqual([], self._samples(zun.ContainerCpuTimePollster))
+        self.assertEqual([], self._samples(zun.ContainerMemoryUsagePollster))
+
+    def test_a_row_naming_only_the_uuid_is_not_sampled(self):
+        """A capsule's container, or an older Zun."""
+        self._only_unavailable({'uuid': 'c-2', 'container_type': 'container',
+                                'reason': 'the runtime gave no reading'})
+        self.assertEqual([], self._samples(zun.ContainerCpuPollster))
+
+    def test_the_first_start_is_not_charged_but_its_usage_is_read(self):
+        self.client.host_stats.return_value = {'results': [
+            _entry('c-1', 'container', allocation_counts=False)],
+            'unavailable': []}
+        self.assertEqual([], self._samples(zun.ContainerCpuPollster))
+        self.assertEqual([], self._samples(zun.ContainerDiskPollster))
+        (s,) = self._samples(zun.ContainerCpuTimePollster)
+        self.assertEqual(5000, s.volume)
+
     def test_stamped_with_when_the_node_read_it(self):
         (s,) = self._samples(zun.ContainerCpuTimePollster)
         self.assertEqual('2026-10-17T01:02:03.000004+00:00', s.timestamp)
@@ -338,6 +377,7 @@ def _notification(event_type, **payload):
         'tenant_id': 'p-1', 'project_id': 'p-1', 'host': 'node-1',
         'image': 'img', 'status': 'Running', 'task_state': None,
         'cpu': 1.0, 'memory': '512', 'disk': 10, 'runtime': 'kata-qemu',
+        'held': {'cpu': 1.0, 'memory': '512', 'disk': 10},
         'created_at': '2026-10-17T00:00:00+00:00',
         'started_at': '2026-10-17T00:00:10+00:00',
         'labels': {'metering.server_group': 'web'},
@@ -411,10 +451,33 @@ class ShippedMeterDefinitionsTest(base.BaseTestCase):
                           status='Error')))
 
     def test_a_resize_gives_what_is_held_after(self):
-        found = self._samples(_notification('container.resize.end',
-                                            memory='1024'))
+        found = self._samples(_notification(
+            'container.resize.end', memory='1024',
+            held={'cpu': 1.0, 'memory': '1024', 'disk': 10}))
 
         self.assertEqual(1024, float(found['container.memory'].volume))
+
+    def test_what_holds_nothing_counts_nothing(self):
+        """Deleting what failed its first start bills no last minute.
+
+        Nor anything else that would make a resource for it: a sample with
+        no volume is dropped before it gets that far.
+        """
+        for event, kind in (('container.delete.end', 'container'),
+                            ('capsule.delete.end', 'capsule')):
+            found = self._samples(_notification(
+                event, container_type=kind, status='Deleted', held=None,
+                started_at=None))
+
+            self.assertTrue(found)
+            for name, sample in found.items():
+                self.assertIsNone(sample.volume, name)
+
+    def test_what_was_held_until_the_delete_counts(self):
+        found = self._samples(_notification('capsule.delete.end',
+                                            container_type='capsule'))
+
+        self.assertEqual(1.0, found['capsule.cpu'].volume)
 
     def test_a_capsule_is_its_own(self):
         found = self._samples(_notification(

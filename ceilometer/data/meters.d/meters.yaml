@@ -460,11 +460,15 @@ metric:
   # Allocation is read from the .end of an operation only, as for nova's
   # instances: *.update is also sent for a record not yet placed and for
   # one that failed to start, neither of which holds anything.
+  # And from held, not from cpu, memory and disk, which describe the object
+  # whatever it holds: held is null for a first start and for one that
+  # failed, including when one of those is deleted, and a sample without a
+  # volume is dropped by the pipeline.
   - name: 'container.cpu'
     event_type: &zun_container_events '^container\.(create|start|stop|pause|unpause|restart|rebuild|resize|delete)\.end$'
     type: 'gauge'
     unit: 'vcpu'
-    volume: $.payload.cpu
+    volume: $.payload.held.cpu
     user_id: $.payload.user_id
     project_id: $.payload.project_id
     resource_id: $.payload.uuid
@@ -482,7 +486,7 @@ metric:
     event_type: *zun_container_events
     type: 'gauge'
     unit: 'MB'
-    volume: $.payload.memory
+    volume: $.payload.held.memory
     user_id: $.payload.user_id
     project_id: $.payload.project_id
     resource_id: $.payload.uuid
@@ -495,7 +499,7 @@ metric:
     event_type: *zun_container_events
     type: 'gauge'
     unit: 'GB'
-    volume: $.payload.disk
+    volume: $.payload.held.disk
     user_id: $.payload.user_id
     project_id: $.payload.project_id
     resource_id: $.payload.uuid
@@ -536,7 +540,7 @@ metric:
     event_type: &zun_capsule_events '^capsule\.(create|start|stop|pause|unpause|restart|rebuild|delete)\.end$'
     type: 'gauge'
     unit: 'vcpu'
-    volume: $.payload.cpu
+    volume: $.payload.held.cpu
     user_id: $.payload.user_id
     project_id: $.payload.project_id
     resource_id: $.payload.uuid
@@ -550,7 +554,7 @@ metric:
     event_type: *zun_capsule_events
     type: 'gauge'
     unit: 'MB'
-    volume: $.payload.memory
+    volume: $.payload.held.memory
     user_id: $.payload.user_id
     project_id: $.payload.project_id
     resource_id: $.payload.uuid
@@ -563,7 +567,7 @@ metric:
     event_type: *zun_capsule_events
     type: 'gauge'
     unit: 'GB'
-    volume: $.payload.disk
+    volume: $.payload.held.disk
     user_id: $.payload.user_id
     project_id: $.payload.project_id
     resource_id: $.payload.uuid
