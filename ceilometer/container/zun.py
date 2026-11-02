@@ -31,6 +31,11 @@ A sample is timestamped with the time the node took the reading, not the
 time it was asked for, so a rate worked out from two samples is right
 however late either answer arrived. What the node could not read is not
 sampled: an absent figure is not a zero.
+
+What was allocated is another matter. It is held whether or not the runtime
+can read anything, so a stopped container or a capsule on a dead sandbox goes
+on reporting it, and it is left out only where Zun says it does not count:
+during the first start, after a first start that failed.
 """
 
 from oslo_log import log
@@ -109,6 +114,8 @@ METERS = {
     'disk.write.bytes': (sample.TYPE_CUMULATIVE, 'B', _blkio('write_bytes')),
 }
 
+_ALLOCATIONS = ('cpu', 'memory', 'disk')
+
 _METADATA_FIELDS = ('name', 'host', 'image', 'runtime', 'status',
                     'container_type', 'started_at', 'capsule_uuid',
                     'allocation_included_in_parent', 'allocation_basis')
@@ -173,11 +180,16 @@ class _ZunPollster(plugin_base.PollsterBase):
                 cache[('zun', resource.host, resource.kind,
                        resource.label)] = {'results': []}
                 continue
-            for entry in answer.get('results') or []:
+            entries = (list(answer.get('results') or []) +
+                       list(answer.get('unavailable') or []))
+            for entry in entries:
                 if entry.get('container_type') not in kind['types']:
                     continue
                 volume = volume_of(entry)
                 if volume is None:
+                    continue
+                if (self.METER in _ALLOCATIONS and
+                        entry.get('allocation_counts') is False):
                     continue
                 yield sample.Sample(
                     name=name,
@@ -187,7 +199,8 @@ class _ZunPollster(plugin_base.PollsterBase):
                     user_id=entry.get('user_id'),
                     project_id=entry.get('project_id'),
                     resource_id=entry['uuid'],
-                    timestamp=(entry.get('reading') or {}).get('timestamp'),
+                    timestamp=((entry.get('reading') or {}).get('timestamp')
+                               or entry.get('read_at')),
                     resource_metadata=metadata(self.conf, entry))
 
 

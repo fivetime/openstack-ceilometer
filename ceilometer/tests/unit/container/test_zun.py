@@ -227,6 +227,45 @@ class PollsterTest(base.BaseTestCase):
         self.assertEqual(7, one(zun.ContainerDiskReadBytesPollster))
         self.assertEqual(8, one(zun.ContainerDiskWriteBytesPollster))
 
+    def _held(self, **kw):
+        row = _entry('c-2', 'container', status='Stopped',
+                     read_at='2026-10-17T01:05:00+00:00',
+                     reason='the runtime gave no reading',
+                     allocation_counts=True, **kw)
+        del row['reading']
+        return row
+
+    def _only_unavailable(self, *rows):
+        self.client.host_stats.return_value = {
+            'results': [], 'unavailable': list(rows)}
+
+    def test_a_stopped_container_is_charged_for_what_it_holds(self):
+        self._only_unavailable(self._held())
+        (s,) = self._samples(zun.ContainerCpuPollster)
+        self.assertEqual((1.0, 'c-2'), (s.volume, s.resource_id))
+        self.assertEqual('2026-10-17T01:05:00+00:00', s.timestamp)
+        self.assertEqual('Stopped', s.resource_metadata['status'])
+
+    def test_a_stopped_container_claims_no_usage(self):
+        self._only_unavailable(self._held())
+        self.assertEqual([], self._samples(zun.ContainerCpuTimePollster))
+        self.assertEqual([], self._samples(zun.ContainerMemoryUsagePollster))
+
+    def test_a_row_naming_only_the_uuid_is_not_sampled(self):
+        """A capsule's container, or an older Zun."""
+        self._only_unavailable({'uuid': 'c-2', 'container_type': 'container',
+                                'reason': 'the runtime gave no reading'})
+        self.assertEqual([], self._samples(zun.ContainerCpuPollster))
+
+    def test_the_first_start_is_not_charged_but_its_usage_is_read(self):
+        self.client.host_stats.return_value = {'results': [
+            _entry('c-1', 'container', allocation_counts=False)],
+            'unavailable': []}
+        self.assertEqual([], self._samples(zun.ContainerCpuPollster))
+        self.assertEqual([], self._samples(zun.ContainerDiskPollster))
+        (s,) = self._samples(zun.ContainerCpuTimePollster)
+        self.assertEqual(5000, s.volume)
+
     def test_stamped_with_when_the_node_read_it(self):
         (s,) = self._samples(zun.ContainerCpuTimePollster)
         self.assertEqual('2026-10-17T01:02:03.000004+00:00', s.timestamp)
