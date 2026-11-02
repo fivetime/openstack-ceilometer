@@ -603,3 +603,77 @@ metric:
     user_metadata: $.payload.labels
     metadata:
       <<: *zun_capsule_meta
+
+  # Allocation is billed the Fargate way: the pod's size, used or not. Polling
+  # (ceilometer central, k8s pollsters) gives the per-minute points CloudKitty
+  # sums; these event points make sure a pod has its size recorded from the
+  # instant it started even if no poll ever caught it.
+  #
+  # NOTE: No meter here is fed by k8s.pod.delete.end at the end time. ceilometer
+  # stamps the gnocchi resource's ended_at with the notification's timestamp, and
+  # kubezoo-metering makes that timestamp the pod's real end. A measure at that
+  # same instant makes gnocchi revive the resource (it only stays ended while
+  # ended_at > the latest measure; Zun-Metering-Redesign s.13.3 #4). Zun escapes
+  # by sending late; this meter sends the true time, so it must not measure at it.
+  - name: 'k8s.pod.cpu'
+    event_type: &k8s_pod_size_events ['k8s.pod.create.end', 'k8s.pod.resize.end']
+    type: 'gauge'
+    unit: 'vcpu'
+    volume: $.payload.allocation.cpu
+    project_id: $.payload.project_id
+    resource_id: $.payload.pod_uid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.metering
+    metadata: &k8s_pod_meta
+      # started_at is here so that the resource gets the pod's real start
+      # even when this sample, not the create event, is what creates it.
+      started_at: $.payload.started_at
+      name: $.payload.name
+      namespace: $.payload.namespace
+      tenant_id: $.payload.tenant_id
+      node: $.payload.node
+      pool: $.payload.pool
+      runtime_class: $.payload.runtime_class
+      qos_class: $.payload.qos_class
+      owner_kind: $.payload.owner_kind
+      owner_name: $.payload.owner_name
+      status: $.payload.phase
+      allocation_basis: $.payload.allocation.basis
+
+  - name: 'k8s.pod.memory'
+    event_type: *k8s_pod_size_events
+    type: 'gauge'
+    unit: 'MB'
+    volume: $.payload.allocation.memory_mb
+    project_id: $.payload.project_id
+    resource_id: $.payload.pod_uid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.metering
+    metadata: *k8s_pod_meta
+
+  - name: 'k8s.pod.disk'
+    event_type: *k8s_pod_size_events
+    type: 'gauge'
+    unit: 'GB'
+    volume: $.payload.allocation.ephemeral_storage_gb
+    project_id: $.payload.project_id
+    resource_id: $.payload.pod_uid
+    timestamp: $.payload.occurred_at
+    user_metadata: $.payload.metering
+    metadata: *k8s_pod_meta
+
+  # One point per pod, its billed life in seconds. Stamped at the START: the
+  # same value at the same instant however often it is redelivered, and never
+  # at the end (see the header).
+  - name: 'k8s.pod.lifetime'
+    event_type: 'k8s.pod.delete.end'
+    type: 'gauge'
+    unit: 's'
+    volume:
+      fields: [$.payload.started_at, $.payload.ended_at]
+      plugin: 'timedelta'
+    project_id: $.payload.project_id
+    resource_id: $.payload.pod_uid
+    timestamp: $.payload.started_at
+    user_metadata: $.payload.metering
+    metadata: *k8s_pod_meta

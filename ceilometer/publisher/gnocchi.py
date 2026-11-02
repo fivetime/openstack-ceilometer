@@ -149,6 +149,10 @@ class ResourcesDefinition:
         for attr, field in self.cfg.get('event_attributes', {}).items():
             value = traits.get(field)
             if value is not None:
+                # A datetime trait is a datetime object here, and the Gnocchi
+                # client cannot serialize one.
+                if hasattr(value, 'isoformat'):
+                    value = value.isoformat()
                 attrs[attr] = value
         return attrs
 

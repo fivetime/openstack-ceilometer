@@ -407,3 +407,57 @@ resources:
     event_attributes:
       <<: *zun_event_attributes
       allocation_basis: allocation_basis
+
+  # kubezoo tenants' pods (kubezoo-metering). The type is created by
+  # ceilometer-upgrade (gnocchi_client.resources_update_operations).
+  - resource_type: k8s_pod
+    # Archive policies are the operator's: per-minute billing needs a 60 s
+    # one (ceilometer-minute in overrides/ceilometer), as Zun's capsule.* do.
+    metrics:
+      k8s.pod.cpu:
+      k8s.pod.memory:
+      k8s.pod.disk:
+      k8s.pod.lifetime:
+    attributes:
+      # NOTE: the notification agent turns one k8s.pod.create.end into an
+      # event (event_create, which carries started_at) and into k8s.pod.*
+      # samples, and either may reach Gnocchi first. A sample that creates
+      # the resource without started_at leaves Gnocchi's "now" there, and the
+      # event's create is then ignored as a duplicate. kubezoo-metering sends
+      # late after a restart, so "now" can be minutes after the pod started.
+      started_at: resource_metadata.started_at
+      name: resource_metadata.name
+      namespace: resource_metadata.namespace
+      tenant_id: resource_metadata.tenant_id
+      node: resource_metadata.node
+      pool: resource_metadata.pool
+      runtime_class: resource_metadata.runtime_class
+      qos_class: resource_metadata.qos_class
+      # Only the pollsters' samples carry this, already as text. Without it a
+      # resource created by a sample before its create event never gets it,
+      # because that event is then ignored as a duplicate.
+      platform_workload: resource_metadata.platform_workload
+      owner_kind: resource_metadata.owner_kind
+      owner_name: resource_metadata.owner_name
+      status: resource_metadata.status
+      allocation_basis: resource_metadata.allocation_basis
+    event_create: k8s.pod.create.end
+    event_delete: k8s.pod.delete.end
+    event_attributes:
+      id: resource_id
+      project_id: project_id
+      # The pod's real start. The fork's publisher only falls back to the
+      # notification time when this is absent (resource.setdefault).
+      started_at: started_at
+      name: name
+      namespace: namespace
+      tenant_id: tenant_id
+      node: node
+      pool: pool
+      runtime_class: runtime_class
+      qos_class: qos_class
+      platform_workload: platform_workload
+      owner_kind: owner_kind
+      owner_name: owner_name
+      status: status
+      allocation_basis: allocation_basis

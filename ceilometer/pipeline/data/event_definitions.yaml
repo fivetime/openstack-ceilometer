@@ -740,3 +740,65 @@
     <<: *zun_traits
     allocation_basis:
       fields: payload.allocation_basis
+
+# kubezoo tenants' pods, sent by kubezoo-metering (github.com/fivetime/kubezoo-metering,
+# whose pkg/notify defines the payload).
+- event_type: ['k8s.pod.*']
+  traits:
+    resource_id:
+      fields: payload.pod_uid
+    project_id:
+      fields: payload.project_id
+    tenant_id:
+      fields: payload.tenant_id
+    name:
+      fields: payload.name
+    namespace:
+      fields: payload.namespace
+    upstream_namespace:
+      fields: payload.upstream_namespace
+    owner_kind:
+      fields: payload.owner_kind
+    owner_name:
+      fields: payload.owner_name
+    node:
+      fields: payload.node
+    pool:
+      fields: payload.pool
+    pool_mismatch:
+      fields: payload.pool_mismatch
+    runtime_class:
+      fields: payload.runtime_class
+    qos_class:
+      fields: payload.qos_class
+    platform_workload:
+      fields: payload.platform_workload
+    status:
+      fields: payload.phase
+    allocation_basis:
+      fields: payload.allocation.basis
+    cpu:
+      type: float
+      fields: payload.allocation.cpu
+    memory:
+      type: float
+      fields: payload.allocation.memory_mb
+    disk:
+      type: float
+      fields: payload.allocation.ephemeral_storage_gb
+    created_at:
+      type: datetime
+      fields: payload.created_at
+    started_at:
+      type: datetime
+      fields: payload.started_at
+    ended_at:
+      type: datetime
+      fields: payload.ended_at
+    ended_by:
+      fields: payload.ended_by
+    occurred_at:
+      type: datetime
+      fields: payload.occurred_at
+    observed:
+      fields: payload.observed

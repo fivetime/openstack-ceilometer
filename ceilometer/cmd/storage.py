@@ -80,3 +80,27 @@ def zun_reconcile():
     LOG.info('%(n)d Zun resource(s) %(verb)s', {
         'n': len(ended),
         'verb': 'would be ended' if conf.dry_run else 'ended'})
+
+
+def kubezoo_reconcile():
+    """End the Gnocchi resources of kubezoo pods no longer billed."""
+    conf = cfg.ConfigOpts()
+    conf.register_cli_opts([
+        cfg.BoolOpt('dry-run', default=False,
+                    help='List what would be ended without ending it.'),
+    ])
+    service.prepare_service(conf=conf)
+    from ceilometer import gnocchi_client
+    from ceilometer.kubezoo import reconcile
+    from ceilometer import kubezoo_client
+    try:
+        ended = reconcile.reconcile(kubezoo_client.Client(conf),
+                                    gnocchi_client.get_gnocchiclient(conf),
+                                    dry_run=conf.dry_run)
+    except reconcile.Incomplete as exc:
+        LOG.info('%d k8s_pod resource(s) ended', len(exc.ended))
+        LOG.error('%s', exc)
+        sys.exit(1)
+    LOG.info('%(n)d k8s_pod resource(s) %(verb)s', {
+        'n': len(ended),
+        'verb': 'would be ended' if conf.dry_run else 'ended'})

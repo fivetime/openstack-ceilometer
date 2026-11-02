@@ -1,0 +1,34 @@
+---
+features:
+  - |
+    kubezoo tenants' pods are metered like instances: by their size, used or
+    not. kubezoo-metering (github.com/fivetime/kubezoo-metering) sends
+    ``k8s.pod.create.end``, ``k8s.pod.resize.end``, ``k8s.pod.delete.end``
+    and ``k8s.pod.update`` notifications, now in the event definitions; the
+    new Gnocchi resource type ``k8s_pod`` (created by ``ceilometer-upgrade``)
+    starts and ends on them, at the times the pod recorded. Event meters
+    ``k8s.pod.cpu``, ``k8s.pod.memory``, ``k8s.pod.disk`` (from create and
+    resize) and ``k8s.pod.lifetime`` (from delete) are added.
+  - |
+    New central pollsters ``k8s.pod.cpu`` (vcpu), ``k8s.pod.memory`` (MB) and
+    ``k8s.pod.disk`` (GB), with discovery ``kubezoo_nodes``, read
+    kubezoo-metering's stats API one node at a time -- as the Zun pollsters
+    read zun-api -- and are partitioned by node. Configure ``[kubezoo]
+    stats_endpoint`` and ``stats_token_file``; unset, nothing is polled.
+    Only pods on real nodes are reported: a pod on a virtual node is a Zun
+    capsule, metered as ``zun_capsule``, so no pod is counted twice. For
+    per-minute billing give these metrics a 60 s archive policy and poll
+    them every 60 s, as for Zun's ``capsule.*``.
+  - |
+    ``ceilometer-kubezoo-reconcile`` ends ``k8s_pod`` resources whose
+    delete notification was lost: at the pod's own end when it has finished
+    but still exists, otherwise at the last time it was seen, marked
+    ``ended_by=reconcile``. If kubezoo-metering cannot be asked, nothing is
+    ended. Run it periodically; ``--dry-run`` lists what it would end.
+upgrade:
+  - |
+    Nothing in a k8s.pod.delete.end measures at the pod's end: the
+    notification's timestamp is the pod's real end and becomes the
+    resource's ``ended_at``, and Gnocchi revives a resource with a measure
+    at or after it. ``k8s.pod.lifetime`` is therefore stamped at the start.
+    Keep this when changing the meter definitions.
